@@ -122,6 +122,7 @@ export class ElevationDataManager extends TypedEventEmitter<ElevationDataEvents>
 
     const loadPromise = ElevationDataTileLoader.loadTileWithCache(
       coordinates,
+      elevationConfig.elevationEndpoint,
       3,
       this.abortController.signal
     )

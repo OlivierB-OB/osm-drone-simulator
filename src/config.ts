@@ -61,6 +61,9 @@ export const elevationConfig = {
 
   // Maximum concurrent tile downloads (prevents network saturation)
   maxConcurrentLoads: 3,
+
+  // AWS Terrain Tiles endpoint for elevation data (Terrarium format)
+  elevationEndpoint: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium',
 };
 
 export const contextDataConfig = {

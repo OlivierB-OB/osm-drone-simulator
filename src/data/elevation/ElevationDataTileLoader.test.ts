@@ -88,9 +88,11 @@ describe('ElevationDataTileLoader', () => {
         .mockRejectedValueOnce(new Error('Network error'));
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
       await expect(
-        ElevationDataTileLoader.loadTile(coordinates)
+        ElevationDataTileLoader.loadTile(coordinates, endpoint)
       ).rejects.toThrow(/Error loading tile/);
     });
 
@@ -101,9 +103,11 @@ describe('ElevationDataTileLoader', () => {
       });
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
       await expect(
-        ElevationDataTileLoader.loadTile(coordinates)
+        ElevationDataTileLoader.loadTile(coordinates, endpoint)
       ).rejects.toThrow(/Failed to fetch tile/);
     });
 
@@ -166,8 +170,13 @@ describe('ElevationDataTileLoader', () => {
       });
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
-      const tile = await ElevationDataTileLoader.loadTile(coordinates);
+      const tile = await ElevationDataTileLoader.loadTile(
+        coordinates,
+        endpoint
+      );
 
       expect(tile.coordinates).toEqual(coordinates);
       expect(tile.tileSize).toBe(256);
@@ -241,8 +250,13 @@ describe('ElevationDataTileLoader', () => {
       });
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
-      const tile = await ElevationDataTileLoader.loadTile(coordinates);
+      const tile = await ElevationDataTileLoader.loadTile(
+        coordinates,
+        endpoint
+      );
 
       const expectedElevation = 200 * 256 + 100 + 128 / 256 - 32768;
       expect(tile.data[0]?.[0]).toBeCloseTo(expectedElevation, 1);
@@ -256,9 +270,12 @@ describe('ElevationDataTileLoader', () => {
         .mockRejectedValue(new Error('Network error'));
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
       const tile = await ElevationDataTileLoader.loadTileWithRetry(
         coordinates,
+        endpoint,
         2
       );
 
@@ -320,9 +337,12 @@ describe('ElevationDataTileLoader', () => {
         });
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
       const tile = await ElevationDataTileLoader.loadTileWithRetry(
         coordinates,
+        endpoint,
         3
       );
 
@@ -338,8 +358,10 @@ describe('ElevationDataTileLoader', () => {
         .mockRejectedValue(new Error('Network error'));
 
       const coordinates: TileCoordinates = { z: 13, x: 4520, y: 3102 };
+      const endpoint =
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
-      await ElevationDataTileLoader.loadTileWithRetry(coordinates, 2);
+      await ElevationDataTileLoader.loadTileWithRetry(coordinates, endpoint, 2);
 
       const elapsed = Date.now() - startTime;
 

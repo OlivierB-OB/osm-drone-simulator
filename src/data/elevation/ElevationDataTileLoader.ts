@@ -71,19 +71,20 @@ export class ElevationDataTileLoader {
    * PNG-encoded elevation: elevation = (R × 256 + G + B/256) - 32768 meters
    *
    * @param coordinates - Tile coordinates to load
+   * @param endpoint - Base URL endpoint for elevation tiles (e.g., https://s3.amazonaws.com/elevation-tiles-prod/terrarium)
    * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded elevation tile with raster data
    * @throws Error if tile cannot be loaded or parsed
    */
   static async loadTile(
     coordinates: TileCoordinates,
+    endpoint: string,
     signal?: AbortSignal
   ): Promise<ElevationDataTile> {
     const { z, x, y } = coordinates;
 
-    // AWS Terrain Tiles - Terrarium format (free, no API key required)
-    // Using S3 endpoint with Terrarium RGB encoding
-    const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+    // Construct URL using the provided endpoint
+    const url = `${endpoint}/${z}/${x}/${y}.png`;
 
     try {
       const response = await fetch(url, { signal });
@@ -221,12 +222,14 @@ export class ElevationDataTileLoader {
    * Returns null if all retry attempts fail.
    *
    * @param coordinates - Tile coordinates to load
+   * @param endpoint - Base URL endpoint for elevation tiles
    * @param maxRetries - Maximum retry attempts (default: 3)
    * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded tile or null if loading failed
    */
   static async loadTileWithRetry(
     coordinates: TileCoordinates,
+    endpoint: string,
     maxRetries: number = 3,
     signal?: AbortSignal
   ): Promise<ElevationDataTile | null> {
@@ -234,7 +237,11 @@ export class ElevationDataTileLoader {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        return await ElevationDataTileLoader.loadTile(coordinates, signal);
+        return await ElevationDataTileLoader.loadTile(
+          coordinates,
+          endpoint,
+          signal
+        );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -257,12 +264,14 @@ export class ElevationDataTileLoader {
    * otherwise fetches from S3 with retry logic and stores in cache.
    *
    * @param coordinates - Tile coordinates to load
+   * @param endpoint - Base URL endpoint for elevation tiles
    * @param maxRetries - Maximum retry attempts for network fetch (default: 3)
    * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded tile or null if loading failed
    */
   static async loadTileWithCache(
     coordinates: TileCoordinates,
+    endpoint: string,
     maxRetries: number = 3,
     signal?: AbortSignal
   ): Promise<ElevationDataTile | null> {
@@ -285,6 +294,7 @@ export class ElevationDataTileLoader {
     // Fetch from network with retries if not in cache
     const tile = await ElevationDataTileLoader.loadTileWithRetry(
       coordinates,
+      endpoint,
       maxRetries,
       signal
     );
