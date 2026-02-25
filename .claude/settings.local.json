@@ -28,7 +28,9 @@
       "Bash(bun run lint:*)",
       "Bash(bun run:*)",
       "Bash(bun install:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "WebFetch(domain:wiki.openstreetmap.org)",
+      "WebFetch(domain:taginfo.openstreetmap.org)"
     ]
   }
 }
