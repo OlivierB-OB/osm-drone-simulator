@@ -29,20 +29,6 @@ The `barrier=*` key describes man-made structures that physically restrict or co
 - **Common sub-tags**: `material=*`, `height=*`
 - **Status**: approved
 
-### `barrier=kerb`
-
-- **Element types**: node / way
-- **Description**: A short solid barrier, usually found at the edge of a road, path, or sidewalk. Separates carriageway from footway and controls drainage.
-- **Common sub-tags**: `height=*`, `kerb=*`
-- **Status**: approved
-
-### `barrier=bollard`
-
-- **Element types**: node / way
-- **Description**: A solid (usually concrete or metal) pillar or post used to control or block traffic. Often placed to prevent vehicles from entering pedestrian areas.
-- **Common sub-tags**: `bollard=*`, `access=*`
-- **Status**: approved
-
 ### `barrier=gate`
 
 - **Element types**: node / way
@@ -57,23 +43,10 @@ The `barrier=*` key describes man-made structures that physically restrict or co
 - **Common sub-tags**: `access=*`, `locked=*`
 - **Status**: approved
 
-### `barrier=cycle_barrier`
-
-- **Element types**: node
-- **Description**: Barriers to bicycle traffic consisting of staggered steel bars perpendicular to the way, preventing cyclists from passing at speed while allowing pedestrians through.
-- **Common sub-tags**: `access=*`
-- **Status**: approved
-
 ### `barrier=motorcycle_barrier`
 
 - **Element types**: node
 - **Description**: A barrier installed along paths specifically to prevent motorcycle and moped access while generally allowing cyclists and pedestrians to pass.
-- **Status**: approved
-
-### `barrier=block`
-
-- **Element types**: node
-- **Description**: A large, solid, immobile block (usually made of concrete) placed to stop larger vehicles. Used for traffic calming or security perimeters.
 - **Status**: approved
 
 ### `barrier=jersey_barrier`
@@ -87,12 +60,6 @@ The `barrier=*` key describes man-made structures that physically restrict or co
 
 - **Element types**: way
 - **Description**: A roadside or median barrier made of steel wire ropes mounted on weak posts designed to absorb vehicle impacts. Common on motorway medians.
-- **Status**: approved
-
-### `barrier=chain`
-
-- **Element types**: node / way
-- **Description**: A chain hung between posts used to prevent motorised vehicles from entering an area. Often symbolic rather than a physical stop.
 - **Status**: approved
 
 ### `barrier=city_wall`

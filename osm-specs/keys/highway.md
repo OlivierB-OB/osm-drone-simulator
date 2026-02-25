@@ -236,20 +236,6 @@ The primary key for tagging roads, paths, and related infrastructure in OpenStre
 
 ## Node Features
 
-### `highway=bus_stop`
-
-- **Element types**: node
-- **Description**: A small bus stop location where passengers board or alight from buses.
-- **Common sub-tags**: `public_transport=stop_position`, `name=*`, `shelter=yes/no`, `bench=yes/no`
-- **Status**: approved
-
-### `highway=crossing`
-
-- **Element types**: node
-- **Description**: A point where pedestrians can cross a street, e.g. a zebra crossing.
-- **Common sub-tags**: `crossing=unmarked/marked/traffic_signals`, `crossing:markings=*`
-- **Status**: approved
-
 ### `highway=elevator`
 
 - **Element types**: node
@@ -307,13 +293,6 @@ The primary key for tagging roads, paths, and related infrastructure in OpenStre
 - **Element types**: node
 - **Description**: A street light, lamppost, street lamp, light standard, or lamp standard used to illuminate roads and footways.
 - **Common sub-tags**: `lit=yes`, `lamp_type=*`, `support=*`
-- **Status**: approved
-
-### `highway=traffic_signals`
-
-- **Element types**: node
-- **Description**: Traffic lights that control the flow of traffic at an intersection or crossing.
-- **Common sub-tags**: `traffic_signals:direction=*`, `button_operated=yes/no`
 - **Status**: approved
 
 ### `highway=turning_circle`

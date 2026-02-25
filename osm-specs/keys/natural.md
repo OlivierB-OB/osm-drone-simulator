@@ -14,18 +14,19 @@ The `natural` key is used to describe natural physical land features, including 
 
 - **Element types**: node / area
 - **Description**: A tree-covered area (a "forest" or "wood"). Supports additional detail via `leaf_type=*` and `leaf_cycle=*`.
-- **Common sub-tags**: `leaf_type=*`, `leaf_cycle=*`, `name=*`
+- **Common sub-tags**: `leaf_type=broadleaved/needleleaved/mixed`, `leaf_cycle=deciduous/evergreen/mixed`, `name=*`
 
 ### `natural=tree_row`
 
 - **Element types**: way
 - **Description**: A line of trees, typically planted along a road, path, or field boundary.
+- **Common sub-tags**: `leaf_type=broadleaved/needleleaved/mixed`, `leaf_cycle=deciduous/evergreen/mixed`
 
 ### `natural=tree`
 
 - **Element types**: node
 - **Description**: A single tree, notable or otherwise worthy of individual mapping.
-- **Common sub-tags**: `leaf_type=*`, `leaf_cycle=*`, `species=*`, `height=*`
+- **Common sub-tags**: `leaf_type=broadleaved/needleleaved/mixed`, `leaf_cycle=deciduous/evergreen/mixed`, `species=*`, `height=*`
 
 ### `natural=scrub`
 
@@ -51,6 +52,13 @@ The `natural` key is used to describe natural physical land features, including 
 
 - **Element types**: node / area
 - **Description**: Habitat above the tree line covered with grass, dwarf shrubs, and mosses, typically in upland or subarctic regions.
+
+### `natural=tundra`
+
+- **Element types**: area / multipolygon relation
+- **Description**: Treeless cold climate habitat with open, low-growing sedges, grasses, mosses, and lichens. Applies to arctic, alpine, and antarctic tundra where tree growth is limited by low temperatures and short growing seasons. Use more specific tags (`natural=heath`, `natural=grassland`, `natural=wetland`) when individual vegetation patches within the tundra are mapped separately.
+- **Common sub-tags**: `name=*`, `ele=*`
+- **Status**: in use
 
 ### `natural=bare_rock`
 
@@ -90,8 +98,23 @@ The `natural` key is used to describe natural physical land features, including 
 ### `natural=wetland`
 
 - **Element types**: area
-- **Description**: A natural area subject to inundation or with waterlogged ground. Includes marshes, bogs, fens, and swamps.
-- **Common sub-tags**: `wetland=marsh`, `wetland=bog`, `wetland=fen`, `wetland=swamp`
+- **Description**: A natural area subject to inundation or with waterlogged ground. Requires `wetland=*` to specify the type; affects ground texture (green/brown/blue-green).
+- **Common sub-tags**: `wetland=*` (required), `name=*`
+
+#### `wetland=*` values
+
+| Value | Description |
+|-------|-------------|
+| `marsh` | Periodically saturated area dominated by herbaceous (non-woody) vegetation |
+| `reedbed` | Inundated area dominated by tall reeds or bulrushes |
+| `saltmarsh` | Coastal marsh exposed to tidal seawater; salt-tolerant herbs |
+| `tidalflat` | Coastal intertidal area of deposited sediment, exposed at low tide |
+| `wet_meadow` | Semi-wetland meadow saturated with water throughout much of the year |
+| `swamp` | Waterlogged forested area with dense tree/shrub vegetation |
+| `mangrove` | Coastal brackish-to-saline tidal wetland with salt-tolerant trees |
+| `bog` | Peat-filled depression fed by rainfall; acidic, nutrient-poor |
+| `fen` | Groundwater-fed peat wetland covered by grasses, sedges, and reeds |
+| `string_bog` | Bog with alternating elevated ridges (woody plants) and wet sedge flats |
 
 ### `natural=bay`
 
@@ -142,12 +165,6 @@ The `natural` key is used to describe natural physical land features, including 
 
 ### Elevation / Land
 
-### `natural=peak`
-
-- **Element types**: node
-- **Description**: The top (summit) of a hill or mountain.
-- **Common sub-tags**: `name=*`, `ele=*`, `prominence=*`
-
 ### `natural=volcano`
 
 - **Element types**: node
@@ -194,12 +211,6 @@ The `natural` key is used to describe natural physical land features, including 
 
 - **Element types**: node / area
 - **Description**: A natural depression or hole in the surface topography formed by the collapse of underlying karst or other substrate.
-
-### `natural=cave_entrance`
-
-- **Element types**: node / area
-- **Description**: The entrance to a cave: a natural underground space large enough for human entry.
-- **Common sub-tags**: `name=*`, `cave=*`
 
 ### `natural=earth_bank`
 

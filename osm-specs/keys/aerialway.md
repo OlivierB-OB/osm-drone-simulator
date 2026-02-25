@@ -64,13 +64,6 @@ The `aerialway` key is used to map different forms of transportation for people 
 - **Common sub-tags**: `aerialway:capacity=*`, `aerialway:duration=*`
 - **Status**: de facto
 
-### `aerialway=magic_carpet`
-
-- **Element types**: way, node
-- **Description**: A slow-moving conveyor belt on the snow surface, used to transport beginners and young children up gentle slopes without requiring lift skills. Common at beginner ski areas and ski schools.
-- **Common sub-tags**: `aerialway:capacity=*`, `aerialway:duration=*`
-- **Status**: de facto
-
 ### `aerialway=rope_tow`
 
 - **Element types**: way, node

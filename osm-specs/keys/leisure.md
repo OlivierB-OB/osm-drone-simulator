@@ -140,12 +140,6 @@ Describes places where people go in their spare time for sport, recreation, rela
 - **Description**: A place or area where you can play miniature golf, consisting of a series of short holes with obstacles, also known as crazy golf or putt-putt.
 - **Status**: de facto
 
-### `leisure=nature_reserve`
-
-- **Element types**: node / area
-- **Description**: A protected area of importance for wildlife, flora, fauna, or features of geological or other special interest, managed to conserve its natural character.
-- **Status**: de facto
-
 ### `leisure=outdoor_seating`
 
 - **Element types**: node / area

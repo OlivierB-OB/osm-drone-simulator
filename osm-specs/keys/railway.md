@@ -22,12 +22,6 @@ The `railway=*` key is used to tag rails and infrastructure for many kinds of ra
 - **Description**: A higher-standard tram system, normally in its own dedicated right-of-way. Bridges the gap between heavy rail and street-running trams.
 - **Status**: in use
 
-#### `railway=subway`
-
-- **Element types**: way
-- **Description**: A city passenger rail service running mostly grade separated (underground or elevated), distinct from surface trams and light rail.
-- **Status**: in use
-
 #### `railway=narrow_gauge`
 
 - **Element types**: way
@@ -106,13 +100,6 @@ The `railway=*` key is used to tag rails and infrastructure for many kinds of ra
 - **Common sub-tags**: `name=*`, `operator=*`
 - **Status**: in use
 
-#### `railway=tram_stop`
-
-- **Element types**: node
-- **Description**: A place where a passenger can embark or disembark a tram. Placed on the tram track way.
-- **Common sub-tags**: `name=*`, `public_transport=stop_position`
-- **Status**: in use
-
 #### `railway=platform`
 
 - **Element types**: way, area
@@ -146,13 +133,6 @@ The `railway=*` key is used to tag rails and infrastructure for many kinds of ra
 
 - **Element types**: node
 - **Description**: A point where two railway lines cross each other with no interconnection (no switches). The tracks pass over/under each other or cross at grade without the ability to transfer between lines.
-- **Status**: in use
-
-#### `railway=signal`
-
-- **Element types**: node
-- **Description**: Any kind of railway signal controlling train movement, including semaphore signals, colour-light signals, and speed boards.
-- **Common sub-tags**: `railway:signal:main=*`, `railway:signal:speed_limit=*`, `railway:signal:direction=*`
 - **Status**: in use
 
 #### `railway=stop`

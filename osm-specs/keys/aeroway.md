@@ -36,20 +36,6 @@ The `aeroway` key is used to map features related to aerodromes, airfields, and 
 - **Common sub-tags**: `name=*`, `operator=*`, `icao=*`
 - **Status**: de facto
 
-### `aeroway=fuel`
-
-- **Element types**: node
-- **Description**: A fuelling station for aircraft, where aviation fuel (AVGAS or Jet-A) can be obtained. Analogous to a petrol station for ground vehicles.
-- **Common sub-tags**: `fuel:avgas=*`, `fuel:jetA=*`, `operator=*`
-- **Status**: de facto
-
-### `aeroway=gate`
-
-- **Element types**: node
-- **Description**: Marks the gate numbers at airports where passengers wait to board aircraft. These are the numbered or lettered positions at the terminal building, not physical barriers.
-- **Common sub-tags**: `ref=*` (gate number or letter)
-- **Status**: de facto
-
 ### `aeroway=hangar`
 
 - **Element types**: node, area
@@ -78,13 +64,6 @@ The `aeroway` key is used to map features related to aerodromes, airfields, and 
 - **Common sub-tags**: `name=*`, `surface=*`, `length=*`
 - **Status**: de facto
 
-### `aeroway=holding_position`
-
-- **Element types**: node, way
-- **Description**: A designated point or line on a taxiway where aircraft are required to stop and wait for clearance before crossing an active runway or other designated area. Indicated by painted markings on the ground.
-- **Common sub-tags**: `ref=*`
-- **Status**: de facto
-
 ### `aeroway=jet_bridge`
 
 - **Element types**: way
@@ -104,13 +83,6 @@ The `aeroway` key is used to map features related to aerodromes, airfields, and 
 - **Element types**: node
 - **Description**: A ground-based navigation aid that supports visual or instrument navigation for aircraft. Includes facilities such as VOR (VHF Omnidirectional Range), NDB (Non-Directional Beacon), ILS (Instrument Landing System), and DME (Distance Measuring Equipment).
 - **Common sub-tags**: `navigationaid=*` (vor/ndb/ils/dme/vortac), `ref=*`, `name=*`, `frequency=*`
-- **Status**: de facto
-
-### `aeroway=parking_position`
-
-- **Element types**: node, way
-- **Description**: A specific location or stand where an aircraft parks on the apron. Also known as an aircraft stand or gate position. May be marked with a number or letter for ATC reference.
-- **Common sub-tags**: `ref=*`, `aeroway:type=*`
 - **Status**: de facto
 
 ### `aeroway=runway`
@@ -162,9 +134,3 @@ The `aeroway` key is used to map features related to aerodromes, airfields, and 
 - **Common sub-tags**: `name=*`, `height=*`, `operator=*`
 - **Status**: de facto
 
-### `aeroway=windsock`
-
-- **Element types**: node
-- **Description**: A conical textile tube mounted on a mast, designed to indicate wind direction and relative wind speed to pilots on approach. Required equipment at most aerodromes.
-- **Common sub-tags**: `lit=*`
-- **Status**: de facto

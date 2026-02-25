@@ -58,13 +58,6 @@ The `waterway=*` key is used to describe natural or artificial water flows such 
 - **Common sub-tags**: `name=*`, `intermittent=yes`, `tunnel=culvert`, `width=*`
 - **Status**: de facto
 
-### `waterway=ditch`
-
-- **Element types**: way
-- **Description**: A small artificial free-flow waterway used for carrying superfluous water for drainage or irrigation. Smaller than a drain and often found alongside roads and fields.
-- **Common sub-tags**: `name=*`, `intermittent=yes`, `tunnel=culvert`, `width=*`
-- **Status**: de facto
-
 ### `waterway=pressurised`
 
 - **Element types**: way

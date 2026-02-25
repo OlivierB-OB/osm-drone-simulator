@@ -8,13 +8,6 @@ The `power` key identifies a wide range of facilities and features that relate t
 
 ## Values
 
-### `power=cable`
-
-- **Element types**: way
-- **Description**: An insulated cable carrying electrical power, such as transmission or distribution cables located underground, undersea, or overground. Distinguished from `power=line` (overhead) and `power=minor_line` (smaller poles) by its insulated and often buried nature.
-- **Common sub-tags**: `voltage=*`, `location=*` (underground / indoor / underwater / overground / overhead), `cables=*`, `circuits=*`, `operator=*`, `name=*`, `ref=*`
-- **Status**: de facto
-
 ### `power=catenary_mast`
 
 - **Element types**: node
@@ -127,9 +120,3 @@ The `power` key identifies a wide range of facilities and features that relate t
 - **Common sub-tags**: `material=*` (steel / wood / concrete / aluminium / composite), `structure=*` (lattice / tubular / solid), `design=*` (one-level / two-level / donau / three-level / barrel / asymmetric / triangle / flag / delta / y-frame / x-frame / h-frame / portal / bipole / monopolar / etc.), `height=*`, `ref=*`, `operator=*`, `line_attachment=*` (anchor / suspension / pin), `line_management=*` (termination / branch / split / cross / transpose / transition / straight)
 - **Status**: de facto
 
-### `power=transformer`
-
-- **Element types**: node
-- **Description**: A device for stepping up or down electric voltage. Large power transformers are typically located inside substations; pole-mounted transformers should have the pole tagged as `power=pole` with `transformer=distribution`.
-- **Common sub-tags**: `transformer=*`, `operator=*`, `frequency=*`, `location=*`, `rating=*`, `windings=*`
-- **Status**: approved

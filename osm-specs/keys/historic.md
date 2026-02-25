@@ -20,20 +20,6 @@ Used for describing various historic features such as structures, objects, and s
 - **Description**: A historic structure used to convey water, typically a bridge-like construction carrying a channel or pipe across a valley. Applies to both functioning aqueducts and ruins.
 - **Status**: in use
 
-### `historic=archaeological_site`
-
-- **Element types**: node / way / area
-- **Description**: A place in which evidence of past activity is preserved, such as an excavation site, ancient settlement, or location where artefacts have been found.
-- **Common sub-tags**: `site_type=*`, `archaeological_site=*`
-- **Status**: de facto
-
-### `historic=battlefield`
-
-- **Element types**: node / area
-- **Description**: The site of a battle or military skirmish in the past. This could be on land or at sea. A node is placed near the battlefield's centre or an area is drawn to mark its perimeter.
-- **Common sub-tags**: `name=*`, `start_date=*`, `historic:date=*`
-- **Status**: approved
-
 ### `historic=boundary_stone`
 
 - **Element types**: node
