@@ -3,7 +3,6 @@ import type { TileCoordinates } from '../elevation/types';
 import type { ContextDataTile } from './types';
 import { contextDataConfig } from '../../config';
 import { ContextDataTileLoader } from './ContextDataTileLoader';
-import { OverpassStatusManager } from './OverpassStatusManager';
 import { TypedEventEmitter } from '../../core/TypedEventEmitter';
 import type { Drone } from '../../drone/Drone';
 
@@ -28,7 +27,6 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
     new Map();
   private loadingCount: number = 0;
   private abortController: AbortController = new AbortController();
-  private statusManager: OverpassStatusManager | null = null;
   private pendingResolvers: Array<{
     key: string;
     timeoutId: ReturnType<typeof setTimeout>;
@@ -41,11 +39,6 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
 
   constructor(private readonly drone: Drone) {
     super();
-
-    // Initialize status manager if enabled
-    if (contextDataConfig.statusCheckEnabled) {
-      this.statusManager = new OverpassStatusManager();
-    }
 
     drone.on('locationChanged', this.onDroneLocationChanged);
     this.initializeTileRing(drone.getLocation());
@@ -191,7 +184,6 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
         contextDataConfig.overpassEndpoint,
         contextDataConfig.queryTimeout,
         3,
-        this.statusManager ?? undefined,
         this.abortController.signal
       );
 
@@ -318,7 +310,6 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
     }
     this.pendingResolvers = [];
     this.loadingCount = 0;
-    this.statusManager?.dispose();
     this.removeAllListeners();
   }
 }

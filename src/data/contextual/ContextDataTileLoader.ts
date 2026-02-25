@@ -14,7 +14,6 @@ import type {
 import type { TileCoordinates, MercatorBounds } from '../elevation/types';
 import type { MercatorCoordinates } from '../../gis/types';
 import { colorPalette } from '../../config';
-import type { OverpassStatusManager } from './OverpassStatusManager';
 import { ContextTilePersistenceCache } from './ContextTilePersistenceCache';
 
 /**
@@ -146,7 +145,6 @@ out qt;`;
    * @param coordinates - Tile coordinates to load
    * @param endpoint - Overpass API endpoint
    * @param timeout - Query timeout in milliseconds
-   * @param statusManager - Optional OverpassStatusManager for respecting API rate limits
    * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded context tile
    * @throws Error if tile cannot be loaded or parsed
@@ -155,26 +153,10 @@ out qt;`;
     coordinates: TileCoordinates,
     endpoint: string,
     timeout: number,
-    statusManager?: OverpassStatusManager,
     signal?: AbortSignal
   ): Promise<ContextDataTile> {
     const bounds = this.getTileMercatorBounds(coordinates);
     const query = this.generateOverpassQuery(bounds);
-
-    // If status manager is available, wait for next available slot
-    if (statusManager) {
-      const nextSlot = await statusManager.getNextAvailableSlot();
-      if (nextSlot) {
-        const now = new Date();
-        const waitMs = nextSlot.getTime() - now.getTime();
-        if (waitMs > 0) {
-          console.debug(
-            `[ContextDataTileLoader] Waiting ${waitMs}ms for Overpass API slot`
-          );
-          await new Promise((resolve) => setTimeout(resolve, waitMs));
-        }
-      }
-    }
 
     try {
       // Create an AbortController that combines external signal with timeout
@@ -727,7 +709,7 @@ out qt;`;
    * @param endpoint - Overpass API endpoint
    * @param timeout - Query timeout in milliseconds
    * @param maxRetries - Maximum retry attempts (default: 3)
-   * @param statusManager - Optional OverpassStatusManager for respecting API rate limits
+   * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded tile or null if loading failed
    */
   static async loadTileWithRetry(
@@ -735,20 +717,13 @@ out qt;`;
     endpoint: string,
     timeout: number,
     maxRetries: number = 3,
-    statusManager?: OverpassStatusManager,
     signal?: AbortSignal
   ): Promise<ContextDataTile | null> {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        return await this.loadTile(
-          coordinates,
-          endpoint,
-          timeout,
-          statusManager,
-          signal
-        );
+        return await this.loadTile(coordinates, endpoint, timeout, signal);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         const isRateLimit =
@@ -787,7 +762,6 @@ out qt;`;
    * @param endpoint - Overpass API endpoint
    * @param timeout - Query timeout in milliseconds
    * @param maxRetries - Maximum number of retry attempts (default: 3)
-   * @param statusManager - Optional OverpassStatusManager for respecting API rate limits
    * @param signal - Optional AbortSignal for cancellation
    * @returns Loaded context tile or null if load fails
    */
@@ -796,7 +770,6 @@ out qt;`;
     endpoint: string,
     timeout: number,
     maxRetries: number = 3,
-    statusManager?: OverpassStatusManager,
     signal?: AbortSignal
   ): Promise<ContextDataTile | null> {
     const tileKey = `${coordinates.z}:${coordinates.x}:${coordinates.y}`;
@@ -813,7 +786,6 @@ out qt;`;
       endpoint,
       timeout,
       maxRetries,
-      statusManager,
       signal
     );
     if (tile) {

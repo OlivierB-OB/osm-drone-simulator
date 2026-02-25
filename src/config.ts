@@ -78,24 +78,6 @@ export const contextDataConfig = {
 
   // Overpass API endpoint
   overpassEndpoint: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-
-  // Enable checking Overpass API status endpoint for real-time rate limit information
-  statusCheckEnabled: true,
-
-  // Overpass API status endpoint URL
-  statusEndpoint: 'https://overpass-api.de/api/status',
-
-  // How often to poll status endpoint in milliseconds (30 seconds)
-  statusCheckIntervalMs: 30000,
-
-  // How long to wait for status endpoint response before timing out (5 seconds)
-  statusCheckTimeoutMs: 5000,
-
-  // Cache status response for this long before fetching fresh data (30 seconds)
-  statusCacheTtlMs: 30000,
-
-  // Fallback throttle delay in milliseconds if status endpoint is unavailable
-  fallbackThrottleMs: 200,
 };
 
 /**
