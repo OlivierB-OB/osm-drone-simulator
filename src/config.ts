@@ -272,6 +272,42 @@ export const waterwayWidthsMeters: Record<string, number> = {
   default: 3,
 };
 
+/**
+ * Landuse layer draw order: lower number = drawn first (background)
+ * Primary sort is by polygon area descending (larger = background); this map
+ * is a secondary tiebreaker for features of similar size
+ */
+export const landuseLayerPriority: Record<string, number> = {
+  // Broad urban zone fills — always background
+  residential: 10,
+  commercial: 10,
+  retail: 10,
+  industrial: 10,
+  military: 10,
+  // Large agricultural background
+  farmland: 20,
+  // General open areas (default = 30)
+  meadow: 30,
+  recreation_ground: 30,
+  grassland: 30,
+  allotments: 30,
+  plant_nursery: 30,
+  // Specific contained areas, usually nested inside broader zones
+  park: 40,
+  cemetery: 40,
+  construction: 40,
+  orchard: 40,
+  vineyard: 40,
+  // Distinctive natural surfaces — always on top
+  sand: 50,
+  beach: 50,
+  dune: 50,
+  bare_rock: 50,
+  scree: 50,
+  mud: 50,
+  glacier: 50,
+};
+
 export const textureConfig = {
   // Ground canvas size in pixels for rendering OSM features (roads, water, landuse, etc.)
   // Higher values provide more detail but increase canvas rendering time

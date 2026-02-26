@@ -94,6 +94,7 @@ describe('TerrainTextureFactory', () => {
       const result = factory.createTexture(mockTile, '9:261:168');
 
       const texture = result?.getTexture();
+      expect(texture?.flipY).toBe(false);
       expect(texture?.magFilter).toBe(THREE.NearestFilter);
       expect(texture?.minFilter).toBe(THREE.LinearMipmapLinearFilter);
     });

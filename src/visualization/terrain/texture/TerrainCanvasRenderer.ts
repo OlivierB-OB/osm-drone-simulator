@@ -1,6 +1,6 @@
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { MercatorBounds } from '../../../gis/types';
-import { groundColors } from '../../../config';
+import { groundColors, landuseLayerPriority } from '../../../config';
 
 /**
  * Renders context features (landuse, roads, water, vegetation, etc.) onto a canvas.
@@ -64,6 +64,16 @@ export class TerrainCanvasRenderer {
     ctx.fillRect(0, 0, width, height);
   }
 
+  private polygonOuterRingArea(rings: Array<Array<[number, number]>>): number {
+    const ring = rings[0];
+    if (!ring || ring.length < 3) return 0;
+    let area = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      area += (ring[j]![0] + ring[i]![0]) * (ring[j]![1] - ring[i]![1]);
+    }
+    return Math.abs(area) / 2;
+  }
+
   private drawLanduse(
     ctx: CanvasRenderingContext2D,
     tile: ContextDataTile,
@@ -71,7 +81,17 @@ export class TerrainCanvasRenderer {
     scaleX: number,
     scaleY: number
   ): void {
-    for (const lu of tile.features.landuse) {
+    // Sort: larger polygons first (background), type priority as tiebreaker
+    const sorted = [...tile.features.landuse].sort((a, b) => {
+      const pa = landuseLayerPriority[a.type] ?? 30;
+      const pb = landuseLayerPriority[b.type] ?? 30;
+      if (pa !== pb) return pa - pb;
+      return (
+        this.polygonOuterRingArea(b.geometry.coordinates) -
+        this.polygonOuterRingArea(a.geometry.coordinates)
+      );
+    });
+    for (const lu of sorted) {
       ctx.fillStyle = lu.color;
       this.drawPolygon(
         ctx,

@@ -58,6 +58,7 @@ export class TerrainTextureFactory {
     const texture = new this.textureConstructor(canvas);
 
     // Configure texture properties for terrain rendering
+    texture.flipY = false; // Canvas Y=0 is north; V=0 must map to canvas top (no flip)
     texture.magFilter = THREE.NearestFilter; // sharp pixels up close
     texture.minFilter = THREE.LinearMipmapLinearFilter; // smooth at distance
     texture.needsUpdate = true;
