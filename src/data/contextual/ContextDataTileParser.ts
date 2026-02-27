@@ -392,7 +392,18 @@ export class ContextDataTileParser {
       for (const parent of nonParts) {
         const parentRing = (parent.geometry as Polygon).coordinates[0];
         if (!parentRing) continue;
-        if (pointInPolygon(centroid, parentRing)) {
+        let contained = pointInPolygon(centroid, parentRing);
+        if (!contained) {
+          // Fallback: centroid of concave parts can fall outside the polygon itself.
+          // Any vertex of the part inside the parent ring suffices.
+          for (const vertex of ring) {
+            if (pointInPolygon(vertex, parentRing)) {
+              contained = true;
+              break;
+            }
+          }
+        }
+        if (contained) {
           parent.hasParts = true;
           break;
         }

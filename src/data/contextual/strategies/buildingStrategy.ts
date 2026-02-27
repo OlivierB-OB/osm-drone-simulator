@@ -74,7 +74,7 @@ export function classifyBuilding(
         : tags['roof:orientation'] === 'along'
           ? 'along'
           : undefined,
-    isPart: tags['building:part'] === 'yes',
+    isPart: !!tags['building:part'],
   };
   features.buildings.push(building);
 }

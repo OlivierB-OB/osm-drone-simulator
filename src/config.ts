@@ -19,7 +19,7 @@ export const droneConfig = {
   movementSpeed: 300,
 
   // Mouse sensitivity for azimuth control (degrees per pixel of mouse movement)
-  mouseSensitivity: 0.1,
+  mouseSensitivity: 0.15,
 
   // Elevation bounds in meters (0 = ground level)
   elevationMinimum: 0,
