@@ -1,4 +1,5 @@
-import { WebGLRenderer, Scene, Camera } from 'three';
+import { WebGLRenderer } from 'three';
+import type { Scene, Camera } from 'three';
 
 export class Renderer {
   private readonly object: WebGLRenderer;

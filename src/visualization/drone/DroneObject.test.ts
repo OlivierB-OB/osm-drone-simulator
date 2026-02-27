@@ -6,11 +6,15 @@ import { Group, Mesh } from 'three';
 describe('DroneObject', () => {
   let droneObject: DroneObject;
   let drone: Drone;
+  let mockViewer3D: {
+    getScene: () => { add: ReturnType<typeof vi.fn> };
+    render: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     drone = new Drone({ x: 0, y: 0 });
-    const mockScene = { add: vi.fn() };
-    droneObject = new DroneObject(drone, mockScene as any);
+    mockViewer3D = { getScene: () => ({ add: vi.fn() }), render: vi.fn() };
+    droneObject = new DroneObject(drone, mockViewer3D as any);
   });
 
   describe('constructor', () => {
@@ -26,48 +30,62 @@ describe('DroneObject', () => {
     });
   });
 
-  describe('update()', () => {
-    it('should set position', () => {
-      droneObject.update(100, 50, -200, 0);
-      const obj = droneObject.getMesh();
+  describe('position and rotation via events', () => {
+    it('should set position via locationChanged event', () => {
+      const initialPosition = droneObject.getMesh().position.clone();
 
-      expect(obj.position.x).toBe(100);
-      expect(obj.position.y).toBe(50);
-      expect(obj.position.z).toBe(-200);
+      drone.changeElevation(100);
+      drone.startMovingForward();
+      drone.applyMove(0.1); // Move forward
+      drone.stopMovingForward();
+
+      const obj = droneObject.getMesh();
+      expect(obj.position.y).toBe(100); // Elevation changed
+      expect(obj.position).not.toEqual(initialPosition);
     });
 
-    it('should set rotation for azimuth 0 (North)', () => {
-      droneObject.update(0, 0, 0, 0);
+    it('should set rotation with azimuth 0 (North)', () => {
+      // Trigger an event to ensure rotation order is set
+      drone.rotateAzimuth(0);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.order).toBe('YXZ');
       expect(obj.rotation.y).toBeCloseTo(0, 5);
       expect(obj.rotation.x).toBeCloseTo(0, 5);
-      expect(obj.rotation.z).toBe(0);
+      expect(obj.rotation.z).toBeCloseTo(0, 5);
     });
 
     it('should set rotation for azimuth 90 (East)', () => {
-      droneObject.update(0, 0, 0, 90);
+      drone.rotateAzimuth(90);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.y).toBeCloseTo(-Math.PI / 2, 5);
     });
 
+    it('should set rotation for azimuth 180 (South)', () => {
+      drone.rotateAzimuth(180);
+      const obj = droneObject.getMesh();
+
+      expect(obj.rotation.y).toBeCloseTo(-Math.PI, 5);
+    });
+
     it('should set rotation for azimuth 270 (West)', () => {
-      droneObject.update(0, 0, 0, 270);
+      drone.rotateAzimuth(270);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.y).toBeCloseTo((-270 * Math.PI) / 180, 5);
     });
 
-    it('should update position on multiple calls', () => {
-      droneObject.update(10, 20, 30, 0);
-      droneObject.update(100, 200, 300, 45);
-      const obj = droneObject.getMesh();
+    it('should update position on multiple elevation changes', () => {
+      const initialY = droneObject.getMesh().position.y;
 
-      expect(obj.position.x).toBe(100);
-      expect(obj.position.y).toBe(200);
-      expect(obj.position.z).toBe(300);
+      drone.changeElevation(50); // Add 50 to initial elevation (0)
+      expect(droneObject.getMesh().position.y).toBe(50);
+
+      drone.changeElevation(50); // Add 50 more to get 100
+      expect(droneObject.getMesh().position.y).toBe(100);
+
+      expect(droneObject.getMesh().position.y).not.toBe(initialY);
     });
 
     it('should have correct rotation at all cardinal azimuth values', () => {
@@ -79,7 +97,11 @@ describe('DroneObject', () => {
       ];
 
       cases.forEach(({ azimuth, expected }) => {
-        droneObject.update(0, 0, 0, azimuth);
+        // Reset to 0 and rotate to target azimuth
+        const currentAzimuth = drone.getAzimuth();
+        const delta = azimuth - currentAzimuth;
+        drone.rotateAzimuth(delta);
+
         const obj = droneObject.getMesh();
         expect(obj.rotation.y).toBeCloseTo(expected, 5);
         expect(obj.children.length).toBeGreaterThan(0);
@@ -158,6 +180,34 @@ describe('DroneObject', () => {
 
       // Position Y should have changed
       expect(droneObject.getMesh().position.y).not.toBe(initialPosition.y);
+    });
+
+    it('should call render on locationChanged', () => {
+      drone.startMovingForward();
+      drone.applyMove(0.1);
+      expect(mockViewer3D.render).toHaveBeenCalled();
+    });
+
+    it('should call render on azimuthChanged', () => {
+      drone.rotateAzimuth(45);
+      expect(mockViewer3D.render).toHaveBeenCalled();
+    });
+
+    it('should call render on elevationChanged', () => {
+      drone.changeElevation(50);
+      expect(mockViewer3D.render).toHaveBeenCalled();
+    });
+
+    it('should not call render after dispose', () => {
+      droneObject.dispose();
+      mockViewer3D.render.mockClear();
+
+      drone.rotateAzimuth(45);
+      drone.changeElevation(50);
+      drone.startMovingForward();
+      drone.applyMove(0.1);
+
+      expect(mockViewer3D.render).not.toHaveBeenCalled();
     });
   });
 

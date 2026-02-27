@@ -2,13 +2,13 @@ import { type Object3D, Mesh, type MeshStandardMaterial } from 'three';
 import { DroneGeometryFactory } from './factory/DroneGeometryFactory';
 import type { Drone } from '../../drone/Drone';
 import { mercatorToThreeJs } from '../../gis/types';
-import type { Scene } from '../../3Dviewer/Scene';
+import type { Viewer3D } from '../../3Dviewer/Viewer3D';
 
 /**
  * Visual representation of the drone in 3D space.
  * Manages position and orientation.
  * Uses DroneGeometryFactory for decoupled geometry creation.
- * Subscribes to Drone events for automatic position/orientation updates.
+ * Subscribes to Drone events for automatic position/orientation updates and rendering.
  */
 export class DroneObject {
   private readonly group;
@@ -18,13 +18,13 @@ export class DroneObject {
 
   constructor(
     private readonly drone: Drone,
-    private readonly scene: Scene,
+    private readonly viewer3D: Viewer3D,
     private readonly geometryFactory: DroneGeometryFactory = new DroneGeometryFactory()
   ) {
     this.group = this.geometryFactory.createDroneGeometry();
 
     // Add the drone mesh to the scene
-    this.scene.add(this.group);
+    this.viewer3D.getScene().add(this.group);
 
     // Subscribe to Drone events for automatic position/orientation updates
     this.drone.on('locationChanged', this.onLocationChanged);
@@ -41,6 +41,7 @@ export class DroneObject {
     const elevation = this.drone.getElevation();
     const threeCoords = mercatorToThreeJs(location, elevation);
     this.group.position.set(threeCoords.x, threeCoords.y, threeCoords.z);
+    this.viewer3D.render();
   }
 
   /**
@@ -55,21 +56,7 @@ export class DroneObject {
     this.group.rotation.y = -azimuthRad;
     this.group.rotation.x = 0;
     this.group.rotation.z = 0;
-  }
-
-  /**
-   * Update drone visual position and orientation.
-   * @deprecated Use event-driven updates instead. This method is kept for backwards compatibility.
-   */
-  update(x: number, y: number, z: number, azimuthDegrees: number): void {
-    this.group.position.set(x, y, z);
-
-    // Azimuth increases clockwise, Three.js rotation.y increases counterclockwise
-    const azimuthRad = (azimuthDegrees * Math.PI) / 180;
-    this.group.rotation.order = 'YXZ';
-    this.group.rotation.y = -azimuthRad;
-    this.group.rotation.x = 0;
-    this.group.rotation.z = 0;
+    this.viewer3D.render();
   }
 
   getMesh(): Object3D {

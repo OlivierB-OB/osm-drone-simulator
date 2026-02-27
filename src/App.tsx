@@ -69,9 +69,9 @@ export function App() {
       elevationSampler
     );
 
-    droneObject = new DroneObject(drone, viewer3D.getScene());
+    droneObject = new DroneObject(drone, viewer3D);
 
-    animationLoop = new AnimationLoop(viewer3D, drone, viewer3D.getCamera());
+    animationLoop = new AnimationLoop(drone);
     animationLoop.start();
 
     droneController = new DroneController(containerRef, drone);
