@@ -28,7 +28,7 @@ describe('DroneObject', () => {
 
   describe('update()', () => {
     it('should set position', () => {
-      droneObject.update(100, 50, -200, 0, 0.016);
+      droneObject.update(100, 50, -200, 0);
       const obj = droneObject.getMesh();
 
       expect(obj.position.x).toBe(100);
@@ -37,7 +37,7 @@ describe('DroneObject', () => {
     });
 
     it('should set rotation for azimuth 0 (North)', () => {
-      droneObject.update(0, 0, 0, 0, 0.016);
+      droneObject.update(0, 0, 0, 0);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.order).toBe('YXZ');
@@ -47,61 +47,27 @@ describe('DroneObject', () => {
     });
 
     it('should set rotation for azimuth 90 (East)', () => {
-      droneObject.update(0, 0, 0, 90, 0.016);
+      droneObject.update(0, 0, 0, 90);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.y).toBeCloseTo(-Math.PI / 2, 5);
     });
 
     it('should set rotation for azimuth 270 (West)', () => {
-      droneObject.update(0, 0, 0, 270, 0.016);
+      droneObject.update(0, 0, 0, 270);
       const obj = droneObject.getMesh();
 
       expect(obj.rotation.y).toBeCloseTo((-270 * Math.PI) / 180, 5);
     });
 
     it('should update position on multiple calls', () => {
-      droneObject.update(10, 20, 30, 0, 0.016);
-      droneObject.update(100, 200, 300, 45, 0.016);
+      droneObject.update(10, 20, 30, 0);
+      droneObject.update(100, 200, 300, 45);
       const obj = droneObject.getMesh();
 
       expect(obj.position.x).toBe(100);
       expect(obj.position.y).toBe(200);
       expect(obj.position.z).toBe(300);
-    });
-
-    it('should animate rotors without throwing', () => {
-      expect(() => droneObject.update(0, 0, 0, 0, 0.1)).not.toThrow();
-    });
-
-    it('should rotate rotors when deltaTime is positive', () => {
-      const group = droneObject.getMesh() as Group;
-      const rotors = collectRotorMeshes(group);
-      const initialY = rotors.map((r) => r.rotation.y);
-
-      droneObject.update(0, 0, 0, 0, 0.1);
-
-      rotors.forEach((rotor, i) => {
-        const initialYVal = initialY[i];
-        expect(rotor.rotation.y).not.toBeCloseTo(initialYVal ?? 0, 1);
-      });
-    });
-
-    it('should counter-rotate adjacent rotors', () => {
-      const group = droneObject.getMesh() as Group;
-      const rotors = collectRotorMeshes(group);
-      const initialY = rotors.map((r) => r.rotation.y);
-
-      droneObject.update(0, 0, 0, 0, 0.1);
-
-      // Even-indexed and odd-indexed rotors spin in opposite directions
-      const rotor0 = rotors[0];
-      const rotor1 = rotors[1];
-      if (rotor0 && rotor1) {
-        const delta0 = rotor0.rotation.y - (initialY[0] ?? 0);
-        const delta1 = rotor1.rotation.y - (initialY[1] ?? 0);
-        expect(Math.sign(delta0)).not.toBe(Math.sign(delta1));
-      }
     });
 
     it('should have correct rotation at all cardinal azimuth values', () => {
@@ -113,7 +79,7 @@ describe('DroneObject', () => {
       ];
 
       cases.forEach(({ azimuth, expected }) => {
-        droneObject.update(0, 0, 0, azimuth, 0.016);
+        droneObject.update(0, 0, 0, azimuth);
         const obj = droneObject.getMesh();
         expect(obj.rotation.y).toBeCloseTo(expected, 5);
         expect(obj.children.length).toBeGreaterThan(0);
@@ -279,17 +245,6 @@ function countMeshes(
     if (child instanceof Mesh) count++;
   });
   return count;
-}
-
-/** Collect rotor disc meshes (CircleGeometry children) */
-function collectRotorMeshes(obj: Group | Mesh): Mesh[] {
-  const meshes: Mesh[] = [];
-  (obj as Group).traverse((child) => {
-    if (child instanceof Mesh && child.geometry?.type === 'CircleGeometry') {
-      meshes.push(child);
-    }
-  });
-  return meshes;
 }
 
 /** Collect positions of rotor discs (CircleGeometry children positioned above Y=0) */

@@ -1,6 +1,6 @@
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { MercatorBounds } from '../../../gis/types';
-import { groundColors, landuseLayerPriority } from '../../../config';
+import { groundColors } from '../../../config';
 
 /**
  * Renders context features (landuse, roads, water, vegetation, etc.) onto a canvas.
@@ -81,11 +81,8 @@ export class TerrainCanvasRenderer {
     scaleX: number,
     scaleY: number
   ): void {
-    // Sort: larger polygons first (background), type priority as tiebreaker
+    // Sort: larger polygons first (background)
     const sorted = [...tile.features.landuse].sort((a, b) => {
-      const pa = landuseLayerPriority[a.type] ?? 30;
-      const pb = landuseLayerPriority[b.type] ?? 30;
-      if (pa !== pb) return pa - pb;
       return (
         this.polygonOuterRingArea(b.geometry.coordinates) -
         this.polygonOuterRingArea(a.geometry.coordinates)

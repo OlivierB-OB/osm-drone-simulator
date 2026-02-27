@@ -71,12 +71,7 @@ export function App() {
 
     droneObject = new DroneObject(drone, viewer3D.getScene());
 
-    animationLoop = new AnimationLoop(
-      viewer3D,
-      drone,
-      viewer3D.getCamera(),
-      droneObject
-    );
+    animationLoop = new AnimationLoop(viewer3D, drone, viewer3D.getCamera());
     animationLoop.start();
 
     droneController = new DroneController(containerRef, drone);

@@ -10,26 +10,26 @@ function getColorForBuilding(
   tags: Record<string, string>,
   buildingType: string
 ): HexColor {
-  // Priority 1: explicit building:colour tag
-  if (tags['building:colour']) return tags['building:colour'];
-  // Priority 2: building:material lookup
+  // Priority 1: building:material lookup
   const material = tags['building:material'];
   if (material && buildingMaterialColors[material]) {
     return buildingMaterialColors[material]!;
   }
+  // Priority 2: explicit building:colour tag
+  if (tags['building:colour']) return tags['building:colour'];
   // Priority 3: type-based default
   const colors = colorPalette.buildings as Record<string, HexColor>;
   return (colors[buildingType] || colors.default) as HexColor;
 }
 
 function getRoofColor(tags: Record<string, string>): HexColor | undefined {
-  // Priority 1: explicit roof:colour tag
-  if (tags['roof:colour']) return tags['roof:colour'];
-  // Priority 2: roof:material lookup
+  // Priority 1: roof:material lookup
   const material = tags['roof:material'];
   if (material && roofMaterialColors[material]) {
     return roofMaterialColors[material]!;
   }
+  // Priority 2: explicit roof:colour tag
+  if (tags['roof:colour']) return tags['roof:colour'];
   return undefined;
 }
 

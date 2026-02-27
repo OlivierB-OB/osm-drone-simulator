@@ -1,7 +1,6 @@
 import { Viewer3D } from '../3Dviewer/Viewer3D';
 import { Drone } from '../drone/Drone';
 import { Camera } from '../3Dviewer/Camera';
-import type { DroneObject } from '../visualization/drone/DroneObject';
 
 export class AnimationLoop {
   private animationFrameId: number | null = null;
@@ -10,8 +9,7 @@ export class AnimationLoop {
   constructor(
     private readonly viewer3D: Viewer3D,
     private readonly drone: Drone,
-    private readonly camera: Camera,
-    private readonly droneObject: DroneObject
+    private readonly camera: Camera
   ) {}
 
   public start(): void {
@@ -28,9 +26,6 @@ export class AnimationLoop {
       this.drone.applyMove(deltaTime);
 
       // DroneObject updates itself via Drone event subscriptions
-      this.droneObject.animateRotors();
-
-      // Camera updates itself via Drone event subscriptions
       this.viewer3D.render();
     };
     animate(0);

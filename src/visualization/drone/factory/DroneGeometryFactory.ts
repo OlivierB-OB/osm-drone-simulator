@@ -7,8 +7,6 @@ import {
   CircleGeometry,
 } from 'three';
 import { DronePartMaterialFactory } from './DronePartMaterialFactory';
-import { DroneRotorTextureFactory } from './DroneRotorTextureFactory';
-import type { DroneGeometryResult } from '../types';
 
 interface ArmConfig {
   dirX: number;
@@ -29,22 +27,20 @@ export class DroneGeometryFactory {
     private readonly BoxGeometryConstructor: typeof BoxGeometry = BoxGeometry,
     private readonly CylinderGeometryConstructor: typeof CylinderGeometry = CylinderGeometry,
     private readonly CircleGeometryConstructor: typeof CircleGeometry = CircleGeometry,
-    private readonly materialFactory: DronePartMaterialFactory = new DronePartMaterialFactory(),
-    private readonly textureFactory: DroneRotorTextureFactory = new DroneRotorTextureFactory()
+    private readonly materialFactory: DronePartMaterialFactory = new DronePartMaterialFactory()
   ) {}
 
-  createDroneGeometry(): DroneGeometryResult {
+  createDroneGeometry(): Group {
     const group = new this.GroupConstructor();
-    const rotors: Mesh[] = [];
 
     // Local space: -Z = forward (North), +X = right (East), +Y = up
 
     this.createFuselage(group);
     this.createFrontIndicator(group);
-    this.createArmsAndRotors(group, rotors);
+    this.createArmsAndRotors(group);
     this.createLandingSkids(group);
 
-    return { group, rotors };
+    return group;
   }
 
   private createFuselage(group: Group): void {
@@ -84,7 +80,7 @@ export class DroneGeometryFactory {
     group.add(frontIndicator);
   }
 
-  private createArmsAndRotors(group: Group, rotors: Mesh[]): void {
+  private createArmsAndRotors(group: Group): void {
     const fuselageWidth = 1.6;
     const fuselageLength = 2.2;
     const halfW = fuselageWidth / 2;
@@ -102,9 +98,7 @@ export class DroneGeometryFactory {
 
     const armMaterial = this.materialFactory.createArmMaterial();
     const motorMaterial = this.materialFactory.createMotorMaterial();
-    const rotorTexture = this.textureFactory.createRotorTexture();
-    const rotorMaterial =
-      this.materialFactory.createRotorMaterial(rotorTexture);
+    const rotorMaterial = this.materialFactory.createRotorMaterial();
 
     const motorRadius = 0.3;
     const motorHeight = 0.35;
@@ -148,17 +142,14 @@ export class DroneGeometryFactory {
       motor.position.set(rotorX, 0, rotorZ);
       group.add(motor);
 
-      // Rotor disc (circle on top of motor)
+      // Rotor disc (circle on top of motor, tilted horizontal)
       const rotor = new this.MeshConstructor(
         new this.CircleGeometryConstructor(rotorRadius, 16),
         rotorMaterial
       );
       rotor.position.set(rotorX, motorHeight / 2 + 0.05, rotorZ);
-      // YXZ order: Y rotation spins the disc, then X tilts it to horizontal
-      rotor.rotation.order = 'YXZ';
       rotor.rotation.x = -Math.PI / 2;
       group.add(rotor);
-      rotors.push(rotor);
     });
   }
 

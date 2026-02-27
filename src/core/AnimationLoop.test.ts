@@ -7,7 +7,6 @@ describe('AnimationLoop', () => {
   let drone: Drone;
   let mockViewer3D: any;
   let mockCamera: any;
-  let mockDroneObject: any;
 
   beforeEach(() => {
     drone = createDrone();
@@ -20,16 +19,7 @@ describe('AnimationLoop', () => {
       updateChaseCamera: vi.fn(),
     };
 
-    mockDroneObject = {
-      animateRotors: vi.fn(),
-    };
-
-    animationLoop = new AnimationLoop(
-      mockViewer3D,
-      drone,
-      mockCamera,
-      mockDroneObject
-    );
+    animationLoop = new AnimationLoop(mockViewer3D, drone, mockCamera);
 
     // Mock requestAnimationFrame to capture the callback
     vi.stubGlobal(
@@ -127,40 +117,11 @@ describe('AnimationLoop', () => {
     });
   });
 
-  describe('drone object coordination', () => {
-    it('should call droneObject.animateRotors on animation frame', () => {
-      animationLoop.start();
-
-      const callback = (animationLoop as any).__testCallback;
-      if (callback) {
-        callback(100);
-        expect(mockDroneObject.animateRotors).toHaveBeenCalled();
-      }
-    });
-
-    it('should call animateRotors multiple times for continuous animation', () => {
-      animationLoop.start();
-
-      const callback = (animationLoop as any).__testCallback;
-      if (callback) {
-        callback(100);
-        mockDroneObject.animateRotors.mockClear();
-
-        callback(200);
-
-        expect(mockDroneObject.animateRotors).toHaveBeenCalledTimes(1);
-      }
-    });
-  });
-
   describe('execution order', () => {
-    it('should execute in correct order: applyMove -> animateRotors -> render', () => {
+    it('should execute in correct order: applyMove -> render', () => {
       const callOrder: string[] = [];
       vi.spyOn(drone, 'applyMove').mockImplementation(() => {
         callOrder.push('applyMove');
-      });
-      mockDroneObject.animateRotors.mockImplementation(() => {
-        callOrder.push('animateRotors');
       });
       mockViewer3D.render.mockImplementation(() => {
         callOrder.push('render');
@@ -174,13 +135,13 @@ describe('AnimationLoop', () => {
         callOrder.length = 0;
         callback(100);
 
-        expect(callOrder).toEqual(['applyMove', 'animateRotors', 'render']);
+        expect(callOrder).toEqual(['applyMove', 'render']);
       }
     });
   });
 
   describe('integration', () => {
-    it('should coordinate drone, drone object, and rendering', () => {
+    it('should coordinate drone and rendering', () => {
       const droneSpy = vi.spyOn(drone, 'applyMove');
 
       animationLoop.start();
@@ -189,7 +150,6 @@ describe('AnimationLoop', () => {
       if (callback) {
         callback(0);
         expect(droneSpy).toHaveBeenCalled();
-        expect(mockDroneObject.animateRotors).toHaveBeenCalled();
         expect(mockViewer3D.render).toHaveBeenCalled();
       }
     });

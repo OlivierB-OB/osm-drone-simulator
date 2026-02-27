@@ -8,6 +8,7 @@ export const LANDUSE_TYPES = new Set([
   'park',
   'recreation_ground',
   'plant_nursery',
+  'grass',
   'farmland',
   'orchard',
   'vineyard',
@@ -66,7 +67,12 @@ export function classifyLanduse(
     };
     features.landuse.push(landuse);
   } else {
-    const luType = tags.leisure === 'park' ? 'park' : (tags.landuse ?? 'other');
+    const luType =
+      tags.leisure === 'park'
+        ? 'park'
+        : tags.leisure === 'garden'
+          ? 'garden'
+          : (tags.landuse ?? 'other');
     const landuse: LanduseVisual = {
       id,
       geometry: geometry.polygon,

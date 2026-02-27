@@ -150,7 +150,8 @@ export class ContextDataTileParser {
       classifyVegetation(id, tags, geometry, features, true);
     } else if (
       (tags.landuse && LANDUSE_TYPES.has(tags.landuse)) ||
-      tags.leisure === 'park'
+      tags.leisure === 'park' ||
+      tags.leisure === 'garden'
     ) {
       classifyLanduse(id, tags, geometry, features, false);
     } else if (tags.natural && NATURAL_LANDUSE_TYPES.has(tags.natural)) {

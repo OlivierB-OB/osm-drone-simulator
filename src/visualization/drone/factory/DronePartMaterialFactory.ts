@@ -1,4 +1,4 @@
-import { MeshPhongMaterial, CanvasTexture } from 'three';
+import { MeshPhongMaterial, DoubleSide } from 'three';
 
 /**
  * Factory for creating drone component materials.
@@ -37,13 +37,12 @@ export class DronePartMaterialFactory {
     });
   }
 
-  createRotorMaterial(texture: CanvasTexture | null): MeshPhongMaterial {
+  createRotorMaterial(): MeshPhongMaterial {
     return new this.MeshPhongMaterialConstructor({
-      ...(texture && { map: texture }),
-      shininess: texture ? 5 : 30,
-      color: texture ? 0xffffff : 0x111111,
+      color: 0x888888,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.4,
+      side: DoubleSide,
     });
   }
 

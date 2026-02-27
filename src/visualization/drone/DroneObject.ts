@@ -6,13 +6,12 @@ import type { Scene } from '../../3Dviewer/Scene';
 
 /**
  * Visual representation of the drone in 3D space.
- * Manages position, orientation, and rotor animation.
+ * Manages position and orientation.
  * Uses DroneGeometryFactory for decoupled geometry creation.
  * Subscribes to Drone events for automatic position/orientation updates.
  */
 export class DroneObject {
   private readonly group;
-  private readonly rotorMeshes;
   private onLocationChanged = () => this.updatePosition();
   private onAzimuthChanged = () => this.updateRotation();
   private onElevationChanged = () => this.updatePosition();
@@ -22,9 +21,7 @@ export class DroneObject {
     private readonly scene: Scene,
     private readonly geometryFactory: DroneGeometryFactory = new DroneGeometryFactory()
   ) {
-    const { group, rotors } = this.geometryFactory.createDroneGeometry();
-    this.group = group;
-    this.rotorMeshes = rotors;
+    this.group = this.geometryFactory.createDroneGeometry();
 
     // Add the drone mesh to the scene
     this.scene.add(this.group);
@@ -61,32 +58,10 @@ export class DroneObject {
   }
 
   /**
-   * Animate rotors.
-   * Called each frame to update rotor rotation.
-   */
-  animateRotors(): void {
-    // TODO: Remove fixed deltaTime value and restore frame-rate independent rotor animation
-    const deltaTime = 1;
-    // Animate rotors: spin geometry (YXZ order → Y rotation spins disc before X tilts it horizontal)
-    // Counter-rotating pairs match real quadcopter torque balance
-    const rotorSpeed = 10 * Math.PI; // ~10 rev/s
-    this.rotorMeshes.forEach((rotor, index) => {
-      const direction = index % 2 === 0 ? 1 : -1;
-      rotor.rotation.y += direction * rotorSpeed * deltaTime;
-    });
-  }
-
-  /**
    * Update drone visual position and orientation.
    * @deprecated Use event-driven updates instead. This method is kept for backwards compatibility.
    */
-  update(
-    x: number,
-    y: number,
-    z: number,
-    azimuthDegrees: number,
-    deltaTime: number = 0
-  ): void {
+  update(x: number, y: number, z: number, azimuthDegrees: number): void {
     this.group.position.set(x, y, z);
 
     // Azimuth increases clockwise, Three.js rotation.y increases counterclockwise
@@ -95,14 +70,6 @@ export class DroneObject {
     this.group.rotation.y = -azimuthRad;
     this.group.rotation.x = 0;
     this.group.rotation.z = 0;
-
-    // Animate rotors: spin geometry (YXZ order → Y rotation spins disc before X tilts it horizontal)
-    // Counter-rotating pairs match real quadcopter torque balance
-    const rotorSpeed = 10 * Math.PI; // ~10 rev/s
-    this.rotorMeshes.forEach((rotor, index) => {
-      const direction = index % 2 === 0 ? 1 : -1;
-      rotor.rotation.y += direction * rotorSpeed * deltaTime;
-    });
   }
 
   getMesh(): Object3D {

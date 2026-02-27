@@ -112,8 +112,8 @@ export class ContextDataTileLoader {
   node["natural"~"tree|trees"](${bbox});
   way["natural"="tree_row"](${bbox});
   way["natural"~"sand|beach|dune|bare_rock|scree|mud|glacier|fell|tundra|grassland"](${bbox});
-  way["landuse"~"farmland|meadow|orchard|vineyard|allotments|cemetery|construction|recreation_ground|residential|commercial|retail|industrial|military|plant_nursery"](${bbox});
-  way["leisure"="park"](${bbox});
+  way["landuse"~"farmland|meadow|orchard|vineyard|allotments|cemetery|construction|recreation_ground|residential|commercial|retail|industrial|military|plant_nursery|grass"](${bbox});
+  way["leisure"~"park|garden"](${bbox});
   node["man_made"~"tower|chimney|mast|communications_tower|water_tower|silo|storage_tank|lighthouse|crane"](${bbox});
   way["man_made"~"tower|chimney|mast|communications_tower|water_tower|silo|storage_tank|lighthouse|crane"](${bbox});
   node["power"~"tower|pole"](${bbox});
