@@ -1,21 +1,29 @@
-import {
-  CylinderGeometry,
-  BoxGeometry,
-  SphereGeometry,
-  MeshLambertMaterial,
-  Mesh,
-  Group,
-  type Object3D,
-} from 'three';
+import type { Object3D } from 'three';
 import type { StructureVisual } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
 import { structureDefaults } from '../../../config';
+import type { IStructureStrategy } from './strategies/types';
+import { CylinderStrategy } from './strategies/CylinderStrategy';
+import { TaperedCylinderStrategy } from './strategies/TaperedCylinderStrategy';
+import { BoxStrategy } from './strategies/BoxStrategy';
+import { WaterTowerStrategy } from './strategies/WaterTowerStrategy';
+import { CraneStrategy } from './strategies/CraneStrategy';
 
 /**
  * Creates 3D meshes for man-made structures (towers, chimneys, masts, etc.)
  * using parametric shapes from config defaults.
  */
+const cylinderStrategy = new CylinderStrategy();
+
 export class StructureMeshFactory {
+  private readonly strategies = new Map<string, IStructureStrategy>([
+    ['cylinder', cylinderStrategy],
+    ['tapered_cylinder', new TaperedCylinderStrategy()],
+    ['box', new BoxStrategy()],
+    ['water_tower', new WaterTowerStrategy()],
+    ['crane', new CraneStrategy()],
+  ]);
+
   constructor(private readonly elevation: ElevationSampler) {}
 
   create(structures: StructureVisual[]): Object3D[] {
@@ -37,102 +45,13 @@ export class StructureMeshFactory {
       : defaults.radius;
     const color = structure.color;
 
-    // Get world position
     const [mx, my] = this.getPosition(structure);
     const terrainY = this.elevation.sampleAt(mx, my);
 
-    let obj: Object3D;
-
-    switch (defaults.shape) {
-      case 'cylinder':
-        obj = this.createCylinder(radius, height, color);
-        break;
-      case 'tapered_cylinder':
-        obj = this.createTaperedCylinder(radius, height, color);
-        break;
-      case 'box':
-        obj = this.createBox(radius, height, color);
-        break;
-      case 'water_tower':
-        obj = this.createWaterTower(radius, height, color);
-        break;
-      case 'crane':
-        obj = this.createCrane(radius, height, color);
-        break;
-      default:
-        obj = this.createCylinder(radius, height, color);
-    }
-
+    const strategy = this.strategies.get(defaults.shape) ?? cylinderStrategy;
+    const obj = strategy.create({ radius, height, color });
     obj.position.set(mx, terrainY + height / 2, -my);
     return obj;
-  }
-
-  private createCylinder(radius: number, height: number, color: string): Mesh {
-    const geometry = new CylinderGeometry(radius, radius, height, 8);
-    const material = new MeshLambertMaterial({ color });
-    return new Mesh(geometry, material);
-  }
-
-  private createTaperedCylinder(
-    radius: number,
-    height: number,
-    color: string
-  ): Mesh {
-    const geometry = new CylinderGeometry(radius * 0.6, radius, height, 8);
-    const material = new MeshLambertMaterial({ color });
-    return new Mesh(geometry, material);
-  }
-
-  private createBox(radius: number, height: number, color: string): Mesh {
-    const size = radius * 2;
-    const geometry = new BoxGeometry(size, height, size);
-    const material = new MeshLambertMaterial({ color });
-    return new Mesh(geometry, material);
-  }
-
-  private createWaterTower(
-    radius: number,
-    height: number,
-    color: string
-  ): Group {
-    const group = new Group();
-    const material = new MeshLambertMaterial({ color });
-
-    // Support column (thinner cylinder, bottom 2/3)
-    const columnHeight = height * 0.65;
-    const column = new Mesh(
-      new CylinderGeometry(radius * 0.3, radius * 0.3, columnHeight, 8),
-      material
-    );
-    column.position.y = -height / 2 + columnHeight / 2;
-    group.add(column);
-
-    // Tank (sphere at top)
-    const tank = new Mesh(new SphereGeometry(radius, 12, 8), material);
-    tank.position.y = height / 2 - radius;
-    group.add(tank);
-
-    return group;
-  }
-
-  private createCrane(radius: number, height: number, color: string): Group {
-    const group = new Group();
-    const material = new MeshLambertMaterial({ color });
-
-    // Vertical mast
-    const mast = new Mesh(
-      new BoxGeometry(radius * 2, height, radius * 2),
-      material
-    );
-    group.add(mast);
-
-    // Horizontal arm
-    const armLength = height * 0.6;
-    const arm = new Mesh(new BoxGeometry(armLength, radius, radius), material);
-    arm.position.set(armLength / 2, height / 2 - radius, 0);
-    group.add(arm);
-
-    return group;
   }
 
   private getPosition(structure: StructureVisual): [number, number] {
