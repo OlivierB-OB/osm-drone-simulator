@@ -6,6 +6,7 @@ export type DroneEvents = {
   locationChanged: MercatorCoordinates;
   azimuthChanged: number;
   elevationChanged: number;
+  movingChanged: boolean;
 };
 
 export class Drone {
@@ -68,46 +69,73 @@ export class Drone {
     this.emitter.emit('elevationChanged', this.elevation);
   }
 
+  public isMoving(): boolean {
+    return (
+      this.isMovingForward ||
+      this.isMovingBackward ||
+      this.isMovingLeft ||
+      this.isMovingRight
+    );
+  }
+
   startMovingForward(): void {
+    if (this.isMoving()) {
+      this.isMovingForward = true;
+      return;
+    }
     this.isMovingForward = true;
+    this.emitter.emit('movingChanged', true);
   }
 
   startMovingBackward(): void {
+    if (this.isMoving()) {
+      this.isMovingBackward = true;
+      return;
+    }
     this.isMovingBackward = true;
+    this.emitter.emit('movingChanged', true);
   }
 
   startMovingLeft(): void {
+    if (this.isMoving()) {
+      this.isMovingLeft = true;
+      return;
+    }
     this.isMovingLeft = true;
+    this.emitter.emit('movingChanged', true);
   }
 
   startMovingRight(): void {
+    if (this.isMoving()) {
+      this.isMovingRight = true;
+      return;
+    }
     this.isMovingRight = true;
+    this.emitter.emit('movingChanged', true);
   }
 
   stopMovingForward(): void {
     this.isMovingForward = false;
+    if (!this.isMoving()) this.emitter.emit('movingChanged', false);
   }
 
   stopMovingBackward(): void {
     this.isMovingBackward = false;
+    if (!this.isMoving()) this.emitter.emit('movingChanged', false);
   }
 
   stopMovingLeft(): void {
     this.isMovingLeft = false;
+    if (!this.isMoving()) this.emitter.emit('movingChanged', false);
   }
 
   stopMovingRight(): void {
     this.isMovingRight = false;
+    if (!this.isMoving()) this.emitter.emit('movingChanged', false);
   }
 
   applyMove(deltaTime: number): void {
-    // Check if drone is moving in any direction
-    const isMoving =
-      this.isMovingForward ||
-      this.isMovingBackward ||
-      this.isMovingLeft ||
-      this.isMovingRight;
-    if (!isMoving) {
+    if (!this.isMoving()) {
       return;
     }
 

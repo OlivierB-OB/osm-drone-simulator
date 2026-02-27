@@ -16,7 +16,10 @@ export class Scene {
   private readonly directionalLight: DirectionalLight;
   private axisHelper: AxesHelper | null = null;
 
-  constructor(sceneConstructor: typeof ThreeScene = ThreeScene) {
+  constructor(
+    private readonly onChanged: () => void,
+    sceneConstructor: typeof ThreeScene = ThreeScene
+  ) {
     this.object = new sceneConstructor();
     this.object.background = new Color(sceneConfig.sky.color);
 
@@ -60,10 +63,12 @@ export class Scene {
 
   add(object: Object3D): void {
     this.object.add(object);
+    this.onChanged();
   }
 
   remove(object: Object3D): void {
     this.object.remove(object);
+    this.onChanged();
   }
 
   dispose(): void {

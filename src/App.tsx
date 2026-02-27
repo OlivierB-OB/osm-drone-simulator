@@ -2,7 +2,7 @@ import { onMount } from 'solid-js';
 import { Viewer3D } from './3Dviewer/Viewer3D';
 import { DroneController } from './drone/DroneController';
 import { createDrone, Drone } from './drone/Drone';
-import { AnimationLoop } from './core/AnimationLoop';
+import { AnimationLoop } from './drone/AnimationLoop';
 import { ContextDataManager } from './data/contextual/ContextDataManager';
 import { ElevationDataManager } from './data/elevation/ElevationDataManager';
 import { ElevationTilePersistenceCache } from './data/elevation/ElevationTilePersistenceCache';
@@ -72,7 +72,6 @@ export function App() {
     droneObject = new DroneObject(drone, viewer3D);
 
     animationLoop = new AnimationLoop(drone);
-    animationLoop.start();
 
     droneController = new DroneController(containerRef, drone);
 

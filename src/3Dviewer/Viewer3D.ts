@@ -8,6 +8,7 @@ export class Viewer3D {
   private readonly scene: Scene;
   private readonly renderer: Renderer;
   private resizeHandler: (() => void) | null = null;
+  private pendingFrameId: number | null = null;
 
   constructor(
     container: HTMLDivElement,
@@ -21,7 +22,7 @@ export class Viewer3D {
 
     this.camera = new cameraContructor(width, height, drone);
     this.renderer = new rendererContructor(width, height);
-    this.scene = new sceneContructor();
+    this.scene = new sceneContructor(() => this.render());
 
     container.appendChild(this.renderer.getDomElement());
 
@@ -37,6 +38,14 @@ export class Viewer3D {
   }
 
   public render(): void {
+    if (this.pendingFrameId !== null) return;
+    this.pendingFrameId = requestAnimationFrame(() => {
+      this.pendingFrameId = null;
+      this.doRender();
+    });
+  }
+
+  private doRender(): void {
     this.renderer.render(this.scene.getObject(), this.camera.getObject());
   }
 
@@ -51,6 +60,10 @@ export class Viewer3D {
   }
 
   dispose(): void {
+    if (this.pendingFrameId !== null) {
+      cancelAnimationFrame(this.pendingFrameId);
+      this.pendingFrameId = null;
+    }
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
     }

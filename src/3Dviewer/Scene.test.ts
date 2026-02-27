@@ -7,7 +7,7 @@ describe('Scene', () => {
   let scene: Scene;
 
   beforeEach(() => {
-    scene = new Scene();
+    scene = new Scene(() => {});
   });
 
   describe('constructor', () => {
@@ -187,7 +187,7 @@ describe('Scene', () => {
         }
       } as unknown as typeof THREE.Scene;
 
-      const injectedScene = new Scene(mockConstructor);
+      const injectedScene = new Scene(() => {}, mockConstructor);
       const sceneInstance = injectedScene.getObject();
 
       expect(constructorCalls).toHaveLength(1);
@@ -203,7 +203,7 @@ describe('Scene', () => {
       const mockConstructor = class MockScene
         extends THREE.Scene {} as unknown as typeof THREE.Scene;
 
-      const injectedScene = new Scene(mockConstructor);
+      const injectedScene = new Scene(() => {}, mockConstructor);
       const background = injectedScene.getObject().background;
 
       if (background instanceof THREE.Color) {
@@ -217,7 +217,7 @@ describe('Scene', () => {
       const mockConstructor = class MockScene
         extends THREE.Scene {} as unknown as typeof THREE.Scene;
 
-      const injectedScene = new Scene(mockConstructor);
+      const injectedScene = new Scene(() => {}, mockConstructor);
       const mesh = new THREE.Mesh();
       injectedScene.add(mesh);
 
@@ -228,12 +228,36 @@ describe('Scene', () => {
       const mockConstructor = class MockScene
         extends THREE.Scene {} as unknown as typeof THREE.Scene;
 
-      const injectedScene = new Scene(mockConstructor);
+      const injectedScene = new Scene(() => {}, mockConstructor);
       const mesh = new THREE.Mesh();
       injectedScene.add(mesh);
       injectedScene.remove(mesh);
 
       expect(injectedScene.getObject().children).not.toContain(mesh);
+    });
+  });
+
+  describe('onChanged callback', () => {
+    it('should call onChanged when add() is called', () => {
+      const onChanged = vi.fn();
+      const s = new Scene(onChanged);
+      const mesh = new THREE.Mesh();
+
+      s.add(mesh);
+
+      expect(onChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onChanged when remove() is called', () => {
+      const onChanged = vi.fn();
+      const s = new Scene(onChanged);
+      const mesh = new THREE.Mesh();
+      s.add(mesh);
+      onChanged.mockClear();
+
+      s.remove(mesh);
+
+      expect(onChanged).toHaveBeenCalledTimes(1);
     });
   });
 });

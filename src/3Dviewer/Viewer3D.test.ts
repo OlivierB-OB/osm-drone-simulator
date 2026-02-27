@@ -16,8 +16,28 @@ describe('Viewer3D', () => {
   let renderer: Renderer;
   let scene: Scene;
   let drone: Drone;
+  let rafCallbacks: Map<number, FrameRequestCallback>;
+  let rafIdCounter: number;
+  let mockCancelAnimationFrame: ReturnType<typeof vi.fn>;
+
+  function flushRaf() {
+    const callbacks = [...rafCallbacks.values()];
+    rafCallbacks.clear();
+    callbacks.forEach((cb) => cb(0));
+  }
 
   beforeEach(() => {
+    // Stub RAF globals before viewer creation
+    rafCallbacks = new Map();
+    rafIdCounter = 0;
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      const id = ++rafIdCounter;
+      rafCallbacks.set(id, cb);
+      return id;
+    });
+    mockCancelAnimationFrame = vi.fn();
+    vi.stubGlobal('cancelAnimationFrame', mockCancelAnimationFrame);
+
     // Create a container with specific dimensions
     container = document.createElement('div');
     container.style.width = '800px';
@@ -83,8 +103,8 @@ describe('Viewer3D', () => {
     } as unknown as typeof Renderer;
 
     const mockSceneConstructor = class MockSceneClass extends Scene {
-      constructor() {
-        super(mockThreeSceneConstructor);
+      constructor(onChanged: () => void) {
+        super(onChanged, mockThreeSceneConstructor);
       }
     } as unknown as typeof Scene;
 
@@ -104,6 +124,7 @@ describe('Viewer3D', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     try {
       viewer.dispose();
     } catch {
@@ -127,8 +148,9 @@ describe('Viewer3D', () => {
   });
 
   describe('render()', () => {
-    it('should call renderer.render', () => {
+    it('should call renderer.render after frame flush', () => {
       viewer.render();
+      flushRaf();
       expect(mockRenderer.render).toHaveBeenCalled();
     });
 
@@ -137,7 +159,44 @@ describe('Viewer3D', () => {
         viewer.render();
         viewer.render();
         viewer.render();
+        flushRaf();
       }).not.toThrow();
+    });
+
+    it('should coalesce multiple render() calls into one actual render', () => {
+      viewer.render();
+      viewer.render();
+      viewer.render();
+      flushRaf();
+      expect(mockRenderer.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow a new render() after the frame flushes', () => {
+      viewer.render();
+      flushRaf();
+      mockRenderer.render.mockClear();
+
+      viewer.render();
+      flushRaf();
+      expect(mockRenderer.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('should auto-render when an object is added to the scene', () => {
+      mockRenderer.render.mockClear();
+      const mesh = new THREE.Mesh();
+      scene.add(mesh);
+      flushRaf();
+      expect(mockRenderer.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('should auto-render when an object is removed from the scene', () => {
+      const mesh = new THREE.Mesh();
+      scene.add(mesh);
+      flushRaf();
+      mockRenderer.render.mockClear();
+      scene.remove(mesh);
+      flushRaf();
+      expect(mockRenderer.render).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -153,6 +212,13 @@ describe('Viewer3D', () => {
         viewer.dispose();
         viewer.dispose();
       }).not.toThrow();
+    });
+
+    it('should cancel a pending frame on dispose', () => {
+      viewer.render();
+      const pendingId = (viewer as any).pendingFrameId;
+      viewer.dispose();
+      expect(mockCancelAnimationFrame).toHaveBeenCalledWith(pendingId);
     });
   });
 
