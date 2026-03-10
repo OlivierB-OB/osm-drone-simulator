@@ -114,17 +114,26 @@ Canvas Texture (2048×2048, applied to geometry UVs)
 Orchestrates both pipelines and creates final 3D meshes:
 
 ```
-TerrainObjectManager (watches drone position)
-        ├─ tile added → TerrainGeometryFactory
-        ├─ tile added → TerrainCanvasRenderer
-        ├─ both complete → TerrainObjectFactory creates mesh
-        └─ position mesh in Three.js scene
+Drone Position Update
+        ↓
+ElevationDataManager              ContextDataManager
+        ↓                                 ↓
+TerrainGeometryObjectManager      TerrainTextureObjectManager
+        ↓                                 ↓
+TerrainGeometryFactory            TerrainCanvasRenderer
+        ↓                                 ↓
+        └─────→ TerrainObjectManager ←────┘
+                        ↓
+                TerrainObjectFactory
+                        ↓
+                  Three.js Mesh
+                   in Scene
 ```
 
 **TerrainObjectManager** is the main orchestrator. It:
-- Subscribes to drone position changes
-- Triggers both elevation and texture pipeline for new tiles
-- Coordinates mesh creation when both are ready
+- Subscribes to both **TerrainGeometryObjectManager** and **TerrainTextureObjectManager**
+- Listens for `geometryAdded`/`geometryRemoved` and `textureAdded`/`textureRemoved` events
+- Coordinates mesh creation via **TerrainObjectFactory** when both geometry and texture are available
 - Manages mesh lifecycle (add/remove from scene)
 
 ---
@@ -406,7 +415,9 @@ Useful for:
 
 | File | Purpose | Responsibility |
 |------|---------|-----------------|
-| `TerrainObjectManager.ts` | Main orchestrator | Subscribe to drone position, trigger pipelines, manage mesh lifecycle |
+| `TerrainObjectManager.ts` | Main orchestrator | Subscribe to geometry/texture managers, coordinate mesh creation, manage lifecycle |
+| `TerrainGeometryObjectManager.ts` | Geometry coordination | Listen to elevation tiles, create geometry objects, emit events |
+| `TerrainTextureObjectManager.ts` | Texture coordination | Listen to context tiles, create texture objects, emit events |
 | `TerrainGeometryFactory.ts` | Geometry creation | Convert elevation data → vertex buffer + normals |
 | `TerrainCanvasRenderer.ts` | Texture rendering | Draw OSM features → canvas texture (painter's algorithm) |
 | `TerrainObjectFactory.ts` | Mesh integration | Create Three.js mesh (geometry + texture), position at tile center |

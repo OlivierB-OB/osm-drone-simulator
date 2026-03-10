@@ -54,18 +54,11 @@ bun run format:check   # Check without modifying
 - `src/core/AnimationLoop.ts` - requestAnimationFrame loop, delta time (seconds), frame synchronization
 - `src/drone/` - Drone physics (Mercator coordinates), DroneController (keyboard input, arrow keys)
 - `src/data/` - ElevationDataManager (tile caching, Web Mercator zoom, z:x:y keys, AWS Terrarium PNG), ContextDataManager (placeholder)
-- `src/visualization/terrain/` - TerrainGeometryObjectManager → TerrainObjectManager → Three.js meshes (two-stage pipeline)
+- `src/visualization/terrain/` - TerrainGeometryObjectManager + TerrainTextureObjectManager → TerrainObjectManager → TerrainObjectFactory → Three.js meshes (orchestrated pipeline)
 - `src/visualization/DroneObject.ts` - Cone mesh representing the drone in the scene
 - `src/config.ts` - Centralized config: drone position/speed, camera chase distance/height, elevation zoom/ring/concurrency
 
-**Animation Frame Order:**
-1. `drone.applyMove(deltaTime)` - Update location/heading (respects drone heading)
-2. `elevationData.setLocation()` - Load/unload tiles in ring around drone
-3. `contextData.setLocation()` - Update context
-4. `terrainObjectManager.refresh()` - Create/remove Three.js meshes in scene
-5. `droneObject.update()` - Position and orient the drone cone mesh
-6. `camera.updateChaseCamera()` - Position camera behind and above drone, lookAt drone
-7. `viewer3D.render()`
+**Animation Frame Order:** See `doc/animation-loop.md` for the detailed frame sequence, timing, and dependencies. The animation loop is orchestrated through event subscriptions triggered by `drone.applyMove(deltaTime)` (step 1), which cascades into data loading, mesh creation, and rendering.
 
 ## Coordinate System: World → Three.js Conversion
 

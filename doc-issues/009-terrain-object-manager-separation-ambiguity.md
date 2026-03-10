@@ -125,4 +125,65 @@ TerrainGeometryObjectManager & TerrainTextureObjectManager
 3. `CLAUDE.md` - update core components section if needed
 
 ## Status
-⏳ Pending Verification & Fix
+✅ RESOLVED
+
+## Resolution Details
+
+### Verification Results
+
+**Scenario A confirmed**: TerrainObjectManager is the high-level orchestrator
+
+Actual architecture verified in code:
+1. **TerrainObjectManager** (`src/visualization/terrain/TerrainObjectManager.ts`)
+   - HIGH-LEVEL ORCHESTRATOR
+   - Subscribes to both TerrainGeometryObjectManager and TerrainTextureObjectManager
+   - Coordinates mesh creation via TerrainObjectFactory
+   - Manages lifecycle (creation/removal) of terrain meshes in Three.js scene
+
+2. **TerrainGeometryObjectManager** (`src/visualization/terrain/geometry/TerrainGeometryObjectManager.ts`)
+   - Listens to ElevationDataManager for tile events
+   - Creates TerrainGeometryObject instances (Three.js BufferGeometry wrappers)
+   - Emits geometryAdded/geometryRemoved events
+
+3. **TerrainTextureObjectManager** (`src/visualization/terrain/texture/TerrainTextureObjectManager.ts`)
+   - Listens to ContextDataManager for tile events
+   - Creates TerrainTextureObject instances (Three.js Texture wrappers)
+   - Emits textureAdded/textureRemoved events
+
+4. **Factories**:
+   - TerrainGeometryFactory - creates BufferGeometry from elevation tiles
+   - TerrainTextureFactory - creates Texture from canvas renderer output
+   - TerrainObjectFactory - creates final Mesh combining geometry + optional texture
+   - TerrainCanvasRenderer - renders OSM context features to canvas
+
+### Documentation Updates Made
+
+1. **doc/visualization/ground-surface.md**
+   - Lines 100-122: Updated orchestration diagram to show actual event flow (geometry/texture managers → TerrainObjectManager)
+   - Lines 409-412: Fixed terminology table to include TerrainGeometryObjectManager and TerrainTextureObjectManager
+   - Added clarification: "TerrainObjectManager is the main orchestrator that coordinates both geometry and texture managers"
+
+2. **doc/architecture.md**
+   - Lines 38-47: Added specific file paths and proper descriptions
+   - Added TerrainCanvasRenderer to component list
+   - Clarified subscription model (events from sub-managers)
+
+3. **CLAUDE.md**
+   - Line 57: Expanded to show complete pipeline: "TerrainGeometryObjectManager + TerrainTextureObjectManager → TerrainObjectManager → TerrainObjectFactory → Three.js meshes"
+
+### Key Finding: Event Flow
+
+```
+Drone.applyMove() → emits locationChanged
+├─ ElevationDataManager.setLocation()
+│  └─ emits tileAdded/tileRemoved
+│     └─ TerrainGeometryObjectManager
+│        └─ emits geometryAdded/geometryRemoved
+│           └─ TerrainObjectManager.handleGeometryAdded()
+│
+└─ ContextDataManager.setLocation()
+   └─ emits tileAdded/tileRemoved
+      └─ TerrainTextureObjectManager
+         └─ emits textureAdded/textureRemoved
+            └─ TerrainObjectManager.handleTextureAdded()
+```

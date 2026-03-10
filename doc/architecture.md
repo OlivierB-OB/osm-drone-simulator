@@ -35,14 +35,19 @@ A real-time 3D drone simulator that renders the drone's viewpoint as it moves th
 - **Produces**: Contextual information for visualization
 
 ### Terrain Visualization
-- **TerrainObjectManager**: Oversees the complete terrain rendering pipeline
-  - Coordinates geometry generation and texture application
+- **TerrainObjectManager** (`src/visualization/terrain/TerrainObjectManager.ts`): Oversees the complete terrain rendering pipeline
+  - Subscribes to both TerrainGeometryObjectManager and TerrainTextureObjectManager
+  - Coordinates mesh creation via TerrainObjectFactory
   - Creates/removes 3D mesh objects as needed
-- **TerrainGeometryObjectManager**: Converts raw elevation data into 3D mesh geometry
-  - Builds the terrain surface from elevation tiles
-  - Culls meshes that are too far away or out of view
-- **TerrainTextureObjectManager**: Renders textures (colors, patterns) on terrain
-  - Generates visual appearance based on elevation and context data
+- **TerrainGeometryObjectManager** (`src/visualization/terrain/geometry/TerrainGeometryObjectManager.ts`): Converts raw elevation data into 3D mesh geometry
+  - Listens to ElevationDataManager for tile events
+  - Creates TerrainGeometryObject wrappers for Three.js BufferGeometry
+  - Emits geometryAdded/geometryRemoved events
+- **TerrainTextureObjectManager** (`src/visualization/terrain/texture/TerrainTextureObjectManager.ts`): Renders textures (colors, patterns) on terrain
+  - Listens to ContextDataManager for tile events
+  - Creates TerrainTextureObject wrappers for Three.js Texture
+  - Emits textureAdded/textureRemoved events
+- **TerrainCanvasRenderer** (`src/visualization/terrain/texture/TerrainCanvasRenderer.ts`): Renders OSM features to canvas
 - **Receives**: Elevation data and context data
 - **Produces**: 3D mesh objects ready for rendering
 
