@@ -37,7 +37,7 @@ export const cameraConfig = {
   near: 0.1,
 
   // Maximum distance from camera to render (far clipping plane)
-  // far distance in meters (one tile length at zoom 15 ≈ 2145m)
+  // far distance in meters (one tile length at zoom 15 ≈ 1,223m via Web Mercator calc)
   // Calculated: 2 * Math.PI * EARTH_RADIUS / Math.pow(2, zoomLevel)
   far: 2145,
 
@@ -58,7 +58,7 @@ export const sceneConfig = {
     // Fog near distance in meters (starts immediately after camera)
     near: 1,
 
-    // Fog far distance in meters (one tile length at zoom 15 ≈ 2145m)
+    // Fog far distance in meters (one tile length at zoom 15 ≈ 1,223m via Web Mercator calc)
     // Calculated: 2 * Math.PI * EARTH_RADIUS / Math.pow(2, zoomLevel)
     far: 2145,
 
