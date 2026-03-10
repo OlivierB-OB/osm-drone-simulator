@@ -53,7 +53,10 @@ describe('Coordinate System Consistency', () => {
       const buildingZ = -centroid[1];
 
       // Verify this matches mercatorToThreeJs formula
-      const result = mercatorToThreeJs({ x: centroid[0], y: centroid[1] }, worldY);
+      const result = mercatorToThreeJs(
+        { x: centroid[0], y: centroid[1] },
+        worldY
+      );
       expect(buildingZ).toBe(result.z);
     });
   });
@@ -259,10 +262,22 @@ describe('Coordinate System Consistency', () => {
       // Azimuth 270° = West = -X direction in Three.js
 
       // Verify with movement in each direction
-      const north: MercatorCoordinates = { x: reference.x, y: reference.y + 1000 };
-      const east: MercatorCoordinates = { x: reference.x + 1000, y: reference.y };
-      const south: MercatorCoordinates = { x: reference.x, y: reference.y - 1000 };
-      const west: MercatorCoordinates = { x: reference.x - 1000, y: reference.y };
+      const north: MercatorCoordinates = {
+        x: reference.x,
+        y: reference.y + 1000,
+      };
+      const east: MercatorCoordinates = {
+        x: reference.x + 1000,
+        y: reference.y,
+      };
+      const south: MercatorCoordinates = {
+        x: reference.x,
+        y: reference.y - 1000,
+      };
+      const west: MercatorCoordinates = {
+        x: reference.x - 1000,
+        y: reference.y,
+      };
 
       const n = mercatorToThreeJs(north, 0);
       const e = mercatorToThreeJs(east, 0);

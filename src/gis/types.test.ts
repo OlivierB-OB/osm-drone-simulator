@@ -246,7 +246,10 @@ describe('mercatorToThreeJs', () => {
       const elevation = 50;
 
       const result = mercatorToThreeJs(location, elevation);
-      const negatedLocation: MercatorCoordinates = { x: location.x, y: -location.y };
+      const negatedLocation: MercatorCoordinates = {
+        x: location.x,
+        y: -location.y,
+      };
       const negatedResult = mercatorToThreeJs(negatedLocation, elevation);
 
       // Negating Y should negate Z

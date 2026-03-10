@@ -1,0 +1,815 @@
+# 3D Object Visualization
+
+## Overview
+
+The simulator visualizes five categories of real-world objects extracted from OpenStreetMap data. Each type is rendered as 3D geometry in the Three.js scene using specialized mesh factories that transform geographic data into spatial meshes.
+
+**Object Categories:**
+
+1. **Buildings**: Extrusion-based 3D structures with parametric roofs (gabled, hipped, domed, etc.)
+2. **Vegetation**: Distributed trees, forests, shrubs, orchards, and vineyards using instanced mesh for efficiency
+3. **Structures**: Man-made objects like towers, chimneys, water towers, and cranes built from parametric shapes
+4. **Barriers**: Linear features like walls, hedges, and fences extruded along their paths
+5. **Bridges**: Elevated deck segments for roads and railways with layer-based height control
+
+**Data Flow:**
+
+```
+OpenStreetMap Tile Data (GeoJSON)
+            ↓
+    Feature Parser (types extraction)
+            ↓
+    Mesh Factory (geometry creation)
+            ↓
+    ElevationSampler (terrain integration)
+            ↓
+    Three.js Scene (positioned at Mercator coordinates)
+            ↓
+    MeshObjectManager (lifecycle: add/remove per tile ring)
+```
+
+---
+
+## Buildings
+
+### Visual Characteristics
+
+Buildings appear as 3D extruded structures with vertical walls and roofs. They range from simple flat-top boxes to complex pitched-roof shapes with varied ridges and orientations. Walls and roofs have distinct colors based on material properties.
+
+**Examples:**
+- Residential house: beige walls (#d4c8b8) with pitched roof (#906050)
+- Modern commercial: gray walls (#c8c0b8) with flat roof (#a0a090)
+- Church: stone walls (#b8b0a0) with dark slate roof (#708090)
+
+### Data Sources
+
+Buildings are identified by OSM tags:
+- `building=*` (type: house, residential, commercial, office, etc.)
+- `height` or `building:levels` (determines wall height)
+- `roof:shape` (flat, gabled, hipped, pyramidal, dome, onion, cone, etc.)
+- `roof:direction` or `roof:orientation` (angles for pitched roofs)
+- `roof:height` (proportion of roof above walls, defaults to 30% of building width)
+- `building:min_level` (height offset for buildings on slopes)
+- `building:material` (brick, concrete, glass, stone, wood, etc.) — overrides type-based color
+- `roof:material` (tiles, slate, metal, copper, grass, thatch, etc.) — overrides default roof color
+- `roof:colour` (explicit RGB override)
+
+### Rendering Strategy
+
+1. **Geometry Creation**: Three.js `ExtrudeGeometry` extrudes a 2D polygon outline vertically to create walls
+   - Outer ring defines building footprint
+   - Inner rings define courtyard holes (cutouts)
+2. **Local Coordinate Space**: Geometry built relative to polygon centroid to preserve precision at large Mercator coordinates
+3. **Wall Height**: Resolved from height tag, levels × 3m, or type-specific defaults
+4. **Roof Handling**:
+   - **Flat roofs**: Top cap of wall extrusion uses roof color
+   - **Pitched roofs**: Separate `RoofGeometryFactory` generates ridge geometry based on shape and orientation; meshes grouped together
+
+### Geometry Details
+
+**Flat-Roof Building:**
+- Single `Mesh` with `ExtrudeGeometry`
+- 3 material groups: walls (sides), ceiling (top cap), base (bottom)
+- Positioned at terrain elevation + min_height
+
+**Pitched-Roof Building:**
+- `Group` containing 2 meshes:
+  1. **Wall mesh**: `ExtrudeGeometry` with wall color
+  2. **Roof mesh**: Parametric shape (gabled polygon, cone, hemisphere, etc.) with roof color
+- Roof mesh positioned above walls at height `wallHeight`
+
+**Material Colors:**
+- Wall: `building:material` override → `building` type default → fallback #d0ccbc
+- Roof: `roof:colour` override → `roof:material` override → roof shape default
+
+### Configuration
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| Default wall height (fallback) | 6m | `buildingHeightDefaults['other']` |
+| Residential house height | 6m | config.ts |
+| Apartment height | 12m per default; 3m per level | config.ts |
+| Cathedral height | 20m | config.ts |
+| Default roof height | 30% of minor OBB axis, clamped [1–8m] | BuildingMeshFactory.defaultRoofHeight() |
+| Flat roof color | #a0a090 | roofColorDefaults.flat |
+| Pitched roof color | #906050 | roofColorDefaults.pitched |
+| Wall color (residential) | #d4c8b8 | colorPalette.buildings.residential |
+
+### Elevation Handling
+
+- **Terrain sampling**: Elevation sampled at polygon centroid via `ElevationSampler.sampleAt()`
+- **Base positioning**: World Y = sampled elevation + min_height
+- **Slope alignment**: Buildings rest on terrain surface; roofs remain level (no tilting)
+- **Precision**: Local coordinate geometry prevents float32 precision loss when building is far from origin
+
+---
+
+## Vegetation
+
+### Visual Characteristics
+
+Vegetation appears as distributed trees, forests, shrubs, and cultivated areas. Trees have visible trunks (cylinders) and canopies (spheres for broadleaf, cones for needleleaf). Scrub and shrubs are compact bushes. Large forests appear as dense point clouds at distance.
+
+**Examples:**
+- Forest: hundreds of tall trees with dark green canopies (#3a7a30)
+- Orchard: grid of evenly-spaced fruit trees
+- Vineyard: dense, low vegetation with small canopies
+- Scrub: scattered bushes without visible trunks (#5a8a40)
+
+### Data Sources
+
+Vegetation areas identified by OSM tags:
+- `natural=forest`, `wood`, `scrub`, `heath`, `grassland`
+- `landuse=forest`, `wood`, `vineyard`, `orchard`
+- `leaf_type=deciduous` or `needleleaved` (determines canopy shape)
+- Single trees: `natural=tree` (Point geometry)
+- Tree rows: `natural=tree_row` (LineString geometry)
+
+### Rendering Strategy
+
+**Strategy Pattern**: Each vegetation type (forest, scrub, orchard, vineyard, single tree, tree row) uses a dedicated strategy class implementing consistent tree/bush creation.
+
+**Key Optimization: InstancedMesh**
+
+Instead of creating individual meshes for 100s or 1000s of trees, the system uses Three.js `InstancedMesh`:
+- Single geometry (e.g., cylinder for trunk) drawn multiple times with different transforms
+- **Memory efficiency**: O(1) geometry, O(n) per-instance transforms (matrices)
+- **GPU efficiency**: Single draw call per type instead of n draw calls
+- **Color variation**: Per-instance color attributes add visual variety
+
+**Distribution Methods:**
+
+1. **Forest/Scrub**: Distribute points randomly within polygon using seeded hash function
+   - Density configured as trees per 100m² (`densityPer100m2`)
+   - Jitter applied to grid to avoid grid artifact
+2. **Orchard/Vineyard**: Regular grid spacing with optional jitter
+   - `spacingX` × `spacingY` meters between plants
+3. **Single Tree**: Point geometry → single tree mesh at location
+4. **Tree Row**: LineString interpolated at regular intervals along path
+
+### Geometry Details
+
+**Tree Structure (Forest/Scrub):**
+- **Trunk**: Tapered cylinder (base 0.2m radius, top 0.15m radius, height 40% of tree)
+- **Canopy**:
+  - Broadleaf: Sphere scaled to crown radius
+  - Needleleaf: Cone scaled to height and radius
+- **Coloring**: Each tree instance assigned random color from palette (#3a7a30 to #407a30 for broadleaf)
+- **Elevation**: Sampled at tree point; trunk base at terrain elevation
+
+**Bush Structure (Scrub):**
+- Single sphere (no trunk), height × 0.6 × radius aspect ratio
+- Color varied from palette (#4a7a38 to #5a8a40)
+
+**Instancing Implementation:**
+```
+count = number of trees
+For each tree i:
+  - Sample terrain elevation at tree location
+  - Create transform matrix (scale + position)
+  - Set matrix at index i in InstancedMesh
+  - Set per-instance color at index i
+Update InstancedMesh.instanceMatrix.needsUpdate = true
+```
+
+### Configuration
+
+| Parameter | Forest | Scrub | Orchard | Vineyard | Tree Row |
+|-----------|--------|-------|---------|----------|----------|
+| **Density** | 1.0 trees/100m² | 4.0 trees/100m² | — | — | — |
+| **Spacing X** | calculated | calculated | 5m | 2m | 8m interval |
+| **Spacing Y** | calculated | calculated | 4m | 1m | along path |
+| **Trunk height min** | 8m | 0m | 3m | 0m | 6m |
+| **Trunk height max** | 15m | 0m | 6m | 0m | 12m |
+| **Crown radius min** | 2m | 1m | 1.5m | 0.4m | 1.5m |
+| **Crown radius max** | 5m | 2.5m | 2.5m | 0.8m | 3m |
+| **Max points per area** | 2000 | 2000 | 2000 | 2000 | — |
+| **Trunk color** | #6b4226 | #6b4226 | #6b4226 | #6b4226 | #6b4226 |
+| **Canopy colors** | See below | #4a7a38–#5a8a40 | #2d6b1e–#408030 | #2d6b1e–#408030 | #2d6b1e–#408030 |
+
+**Color Palettes:**
+- Broadleaf: #2d6b1e, #3a7a30, #357a28, #408030
+- Needleleaf: #1a5020, #205828, #256030, #1a4a20
+
+### Elevation Handling
+
+- **Per-tree sampling**: `ElevationSampler.sampleAt()` called for each tree instance during mesh creation
+- **Terrain-aware positioning**: Trunk base positioned at sampled elevation
+- **Precision**: Matrix transforms include full position (x, terrainY, -y)
+- **Density adaptation**: If estimated point count exceeds 2000, spacing automatically increased to maintain performance
+
+---
+
+## Structures
+
+### Visual Characteristics
+
+Structures appear as distinctive man-made objects: towers rise as cylinders or tapered pillars, water towers have bulbous tanks, cranes have angular frames. Each structure type has a characteristic shape and color.
+
+**Examples:**
+- Cellular tower: gray cylinder 20m tall (#a0a098)
+- Chimney: tapered cylinder 40m tall, darker gray (#888880)
+- Water tower: cylinder with spherical tank on top (#a8a8b0)
+- Crane: complex frame geometry in yellow (#f0b800)
+
+### Data Sources
+
+Structures identified by OSM tags:
+- `man_made=tower`, `chimney`, `mast`, `water_tower`, `silo`, `storage_tank`, `lighthouse`, `crane`
+- `power=tower`, `pole`, `generator` (with subtypes)
+- `aerialway=pylon`
+- `height` tag (in meters)
+- `diameter` tag (converted to radius)
+- `colour` tag (explicit color override)
+
+### Rendering Strategy
+
+**Strategy Pattern**: Each structure type implements `IStructureStrategy` with a `create()` method that generates geometry from parametric inputs (radius, height, color).
+
+**Shapes:**
+- **Cylinder**: Straight-sided pillars (towers, silos, poles, storage tanks)
+- **Tapered Cylinder**: Narrower at top (chimneys, masts, lighthouses)
+- **Box**: Angular frames (power towers, pylon structures)
+- **Water Tower**: Cylinder base with sphere cap
+- **Crane**: Complex multi-part frame with jib and counterweight
+
+### Geometry Details
+
+**Cylinder (Tower, Silo):**
+- `CylinderGeometry(radius, radius, height, 8)` — 8-sided for efficiency
+- Position: X/Z at structure centroid, Y at terrain elevation + height/2 (center of object)
+
+**Tapered Cylinder (Chimney, Mast):**
+- `CylinderGeometry(radiusTop, radiusBottom, height, 8)` — top narrower than bottom
+- Gradual taper creates realistic taper effect
+
+**Box (Power Tower):**
+- `BoxGeometry(width, height, depth)` — cubic or rectangular
+- Stiff angular appearance suitable for lattice structures
+
+**Water Tower:**
+- Composite: cylinder base + sphere tank cap
+- Sphere scaled and positioned above cylinder
+
+**Crane:**
+- Multi-geometry assembly: vertical mast, horizontal jib, counterweight, hook
+- Rotated by structure `rotation_angle` if present
+
+All structures use Lambert material with spec colors for realistic outdoor lighting.
+
+### Configuration
+
+| Structure Type | Shape | Default Height | Default Radius | Color |
+|---|---|---|---|---|
+| tower | cylinder | 20m | 3m | #a0a098 |
+| communications_tower | cylinder | 50m | 4m | #a0a098 |
+| chimney | tapered_cylinder | 40m | 2m | #888880 |
+| mast | tapered_cylinder | 30m | 1m | #b0b0b0 |
+| silo | cylinder | 15m | 4m | #d0c8b0 |
+| storage_tank | cylinder | 10m | 8m | #c0c0c0 |
+| water_tower | water_tower | 20m | 5m | #a8a8b0 |
+| lighthouse | tapered_cylinder | 25m | 3m | #f0f0e8 |
+| crane | crane | 40m | 1m | #f0b800 |
+| power_tower | box | 25m | 1.5m | #c0c0c8 |
+| power_pole | cylinder | 10m | 0.2m | #a08060 |
+| aerialway_pylon | box | 12m | 1m | #b0b0b8 |
+
+### Elevation Handling
+
+- **Position selection**: Point geometries use coordinates directly; polygon geometries use centroid
+- **Terrain sampling**: `ElevationSampler.sampleAt()` called at structure position
+- **Vertical positioning**: Structure centered at terrain elevation + height/2 (so base touches ground)
+- **No rotation**: Structures remain level regardless of terrain slope
+
+---
+
+## Barriers
+
+### Visual Characteristics
+
+Barriers appear as linear features running across the landscape. Walls are thin, tall, and rigid. Hedges are wider, lower, and green. Retaining walls are squat and sturdy. City walls are massive stone structures.
+
+**Examples:**
+- Garden wall: 0.3m wide, 2m tall, beige (#c0b8b0)
+- Hedge: 1m wide, 1.5m tall, dark green (#4a7030)
+- City wall: 2m wide, 6m tall, stone (#c8c0b0)
+- Retaining wall: 0.5m wide, 1.5m tall, gray (#a8a098)
+
+### Data Sources
+
+Barriers identified by OSM tags:
+- `barrier=wall`, `city_wall`, `retaining_wall`, `fence`, `hedge`, `guardrail`
+- `height` tag (in meters)
+- `width` tag (in meters, defaults based on type)
+- `material` tag (brick, concrete, stone, wood, metal) — overrides type color
+- `colour` tag (explicit RGB override)
+
+### Rendering Strategy
+
+**Line Extrusion**: Each LineString segment is converted to a box mesh:
+
+1. For each consecutive pair of coordinates in the LineString:
+   - Compute segment midpoint and length
+   - Calculate rotation angle to align with path
+   - Create `BoxGeometry(width, height, segmentLength)`
+   - Position at midpoint with appropriate rotation
+   - Sample elevation at midpoint
+
+2. **Rotation**: `rotation.y = -angle` where `angle = atan2(dx, dy)` aligns box along path
+
+### Geometry Details
+
+**Box Mesh per Segment:**
+- Dimensions: (width, height, length)
+  - Width: configured per type or tag (0.3m wall, 1m hedge)
+  - Height: configured per type or tag (2m wall, 1.5m hedge)
+  - Length: segment length in Mercator coordinates
+- Material: `MeshLambertMaterial` with type or material-based color
+- Positioning: Centered at segment midpoint, terrain elevation + height/2
+
+**Example (Garden Wall, 50m segment):**
+```
+BoxGeometry(0.3, 2.0, 50)           // 0.3m thick, 2m tall, 50m long
+Position: (midX, terrainY + 1.0, -midY)
+Rotation.y: -angleToAlignWithPath
+Color: #c0b8b0
+```
+
+### Configuration
+
+| Barrier Type | Default Width | Default Height | Default Color |
+|---|---|---|---|
+| wall | 0.3m | 2.0m | #c0b8b0 |
+| city_wall | 2.0m | 6.0m | #c8c0b0 |
+| retaining_wall | 0.5m | 1.5m | #a8a098 |
+| hedge | 1.0m | 1.5m | #4a7030 |
+
+**Material Color Overrides:**
+Same palette as buildings: brick (#c87060), concrete (#c8c4b8), stone (#b8b0a0), wood (#c8a878), metal (#888888), etc.
+
+### Elevation Handling
+
+- **Midpoint sampling**: Elevation sampled at segment midpoint
+- **Vertical positioning**: Height/2 above terrain, so base touches ground
+- **Slope following**: Each segment independently samples elevation, creating stepped appearance on steep terrain
+- **Precision**: Segments reconnect seamlessly across segment boundaries
+
+---
+
+## Bridges
+
+### Visual Characteristics
+
+Bridges appear as elevated flat decks spanning roads and railways. They float above terrain, supported by layer height (vertical separation). Decks are proportionally wider than the underlying road/rail to show structural overhang.
+
+**Examples:**
+- Highway overpass: wide gray deck (#b0a898) elevated 1 layer (5m) above road
+- Railway bridge: thinner deck elevated 2 layers (10m) above terrain
+- Pedestrian bridge: narrow deck at 1 layer height
+
+### Data Sources
+
+Bridges identified by OSM tags:
+- `bridge=yes` on `highway=*` or `railway=*` features
+- `layer=N` (integer, default 1) — vertical separation in multiples of 5m per layer
+- `width` tag for road width, default rail width from `railway=*` type
+- Deck margin: automatically adds 2m on each side of road/rail width
+
+### Rendering Strategy
+
+**Deck Extrusion**: Similar to barriers but simpler — just a flat box at elevated height:
+
+1. For each consecutive pair of coordinates in LineString:
+   - Compute midpoint and length
+   - Calculate rotation angle
+   - Create flat `BoxGeometry(deckWidth, DECK_THICKNESS, segmentLength)` where:
+     - deckWidth = road/rail width + 4m (2m margin per side)
+     - DECK_THICKNESS = 0.5m
+   - Position at terrain elevation + layer × 5m
+
+### Geometry Details
+
+**Deck Mesh per Segment:**
+- Dimensions: (width, 0.5m thickness, length)
+- Width = vehicle width + 4m (represents deck overhang)
+  - Motorway (25m): deck 29m
+  - Railway (4m): deck 8m
+  - Footway (2m): deck 6m
+- Material: Tan/beige Lambert (#b0a898)
+- Positioning: Centered at midpoint, terrain elevation + layer height offset
+
+**Layer Height Calculation:**
+```
+verticalOffset = layer × 5m
+Examples:
+  layer=1: 5m above terrain
+  layer=2: 10m above terrain
+  layer=-1: 5m below terrain (underpass)
+```
+
+### Configuration
+
+| Parameter | Value |
+|---|---|
+| Deck color | #b0a898 (tan, resembles concrete) |
+| Deck thickness | 0.5m |
+| Deck margin | 2m on each side (total +4m to road width) |
+| Layer height multiplier | 5m per layer unit |
+| Default layer | 1 (if not specified) |
+
+### Elevation Handling
+
+- **Base elevation**: Sampled at segment midpoint (same as road/rail below)
+- **Vertical offset**: Added to base elevation based on layer tag
+- **No tilt**: Deck remains horizontal even on slopes (realistic for bridge engineering)
+- **Precision**: Each segment samples independently
+
+---
+
+## Rendering Pipeline
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 OSM Tile Data (GeoJSON)                 │
+│            z/x/y tile from Overpass API                 │
+└──────────────────────┬──────────────────────────────────┘
+                       ↓
+      ┌────────────────────────────────────────┐
+      │  STAGE 1: Feature Extraction (Parser)  │
+      │  • Identify feature types from tags    │
+      │  • Extract geometry (Polygon/Point)    │
+      │  • Parse properties (height, color)    │
+      └────────────────┬───────────────────────┘
+                       ↓
+         ┌─────────────────────────────────┐
+         │  STAGE 2: Mesh Creation         │
+         │  (Factories with Strategies)    │
+         │                                 │
+         │  BuildingMeshFactory            │
+         │    → ExtrudeGeometry            │
+         │    → RoofGeometryFactory        │
+         │                                 │
+         │  VegetationMeshFactory          │
+         │    → ForestStrategy             │
+         │    → InstancedMesh (trunk+can)  │
+         │                                 │
+         │  StructureMeshFactory           │
+         │    → CylinderStrategy, etc.     │
+         │                                 │
+         │  BarrierMeshFactory             │
+         │    → BoxGeometry per segment    │
+         │                                 │
+         │  BridgeMeshFactory              │
+         │    → BoxGeometry (deck)         │
+         └────────┬────────────────────────┘
+                  ↓
+       ┌──────────────────────────┐
+       │  Elevation Integration   │
+       │  ElevationSampler        │
+       │                          │
+       │  • Sample terrain at     │
+       │    key positions         │
+       │  • Bilinear interpolate  │
+       │  • Return elevation (m)  │
+       └────────┬─────────────────┘
+                ↓
+      ┌──────────────────────────────┐
+      │  Position in Three.js Scene  │
+      │                              │
+      │  position.x = mercator.x     │
+      │  position.y = elevation (m)  │
+      │  position.z = -mercator.y    │
+      └────────┬─────────────────────┘
+               ↓
+      ┌───────────────────────────────┐
+      │  MeshObjectManager            │
+      │  • Add meshes to scene        │
+      │  • Track by tile              │
+      │  • Remove old tiles in ring   │
+      │  • Dispose resources          │
+      └───────────────────────────────┘
+```
+
+### Stage 1: Data Parsing
+
+- **Input**: GeoJSON tile with feature collection from Overpass API
+- **Process**: Parser identifies each feature's type using OSM tags (e.g., `building=residential`, `natural=forest`)
+- **Output**: Typed feature objects (`BuildingVisual`, `VegetationVisual`, `StructureVisual`, etc.) with extracted properties
+
+### Stage 2: Mesh Creation
+
+- **Input**: Array of typed features
+- **Process**: Appropriate factory class (`BuildingMeshFactory`, `VegetationMeshFactory`, etc.) creates Three.js geometry
+  - Applies elevation sampling at key points
+  - Builds local coordinate geometries for precision
+  - Applies colors, materials, textures
+  - Uses strategy patterns for variant shapes (e.g., roof types, vegetation strategies)
+- **Output**: Array of Three.js `Object3D` (Mesh, Group, or InstancedMesh)
+
+### Stage 3: Scene Management
+
+- **Input**: Meshes from Stage 2
+- **Process**: `MeshObjectManager` coordinates mesh lifecycle
+  - Adds meshes to Three.js scene at current position
+  - Tracks meshes by tile key (z:x:y)
+  - When tile ring updates, removes meshes for old tiles
+  - Disposes geometries and materials
+- **Output**: Animated scene with meshes added/removed as drone moves
+
+### Performance Implications
+
+| Stage | Performance Bottleneck | Optimization |
+|---|---|---|
+| **Data Parsing** | Large GeoJSON parsing | Streamed tile loading, parser runs on background |
+| **Mesh Creation** | Geometry generation is CPU-bound | Factories run synchronously; caching geometry templates |
+| **Elevation Sampling** | Bilinear interpolation × thousands of points | Cached in Stage 2, not re-sampled during rendering |
+| **Scene Management** | Add/remove meshes, material disposal | Batched per tile; disposal deferred to next animation frame |
+
+---
+
+## Spatial Organization
+
+### Tile-Based Ring System
+
+Objects are organized by tile and loaded in a ring around the drone:
+
+- **Tile Grid**: Web Mercator zoom 15 divides world into 2^15 × 2^15 tiles (~327m × ~327m each at equator)
+- **Tile Key**: `"z:x:y"` uniquely identifies a tile (e.g., `"15:16807:11239"`)
+- **Ring Radius**: Config parameter `contextDataConfig.ringRadius = 1` loads a 3×3 grid (center ±1 tile in each direction)
+
+**Ring Layout Example (top-down view):**
+```
+Mercator Y (North ↑)
+      ↑
+  [8] [9] [10]
+  [5] [D] [6]     D = drone position
+  [2] [3] [4]
+
+Tiles numbered by fetch order; D is center tile (drone tile)
+When drone crosses tile boundary, ring shifts:
+- New tiles fetched and added
+- Old tiles removed and disposed
+- Seamless transition
+```
+
+### Mercator to Three.js Coordinate Transformation
+
+**Conversion Formula** (see `doc/coordinate-system.md` for full details):
+
+```
+Three.js Position from Mercator:
+  x = mercator.x       (East = +X, direct)
+  y = elevation_m      (Up = +Y, direct)
+  z = -mercator.y      (North = -Z, negated)
+```
+
+**Why Z Negation?**
+- Mercator Y increases northward (standard geographic convention)
+- Three.js default camera looks along -Z axis
+- By mapping Z = -Mercator Y, north (increasing Y) becomes -Z (camera default forward)
+- This makes azimuth 0 (North) align with camera default orientation
+
+**Verification:**
+```
+Paris (48.853°N, 2.350°E) = Mercator (261700, 6250000)
+  Three.js: (261700, elevation, -6250000)
+North movement: mercator.y increases → z becomes more negative → -Z direction ✓
+East movement: mercator.x increases → x becomes more positive → +X direction ✓
+```
+
+### Elevation Sampling & Bilinear Interpolation
+
+**Process** (see `ElevationSampler.sampleAt()`):
+
+1. Find covering elevation tile from `ElevationDataManager`
+2. Compute fractional position within 256×256 tile:
+   ```
+   fracX = (mercatorX - tileMinX) / (tileMaxX - tileMinX)  // [0, 1]
+   fracY = 1 - (mercatorY - tileMinY) / (tileMaxY - tileMinY)  // inverted for row indexing
+   ```
+3. Map to pixel coordinates:
+   ```
+   px = fracX × 255, py = fracY × 255  // clamped to [0, 255]
+   ```
+4. Bilinear interpolation from 4 nearest pixels:
+   ```
+   v = v00(1-tx)(1-ty) + v01(tx)(1-ty) + v10(1-tx)(ty) + v11(tx)(ty)
+   ```
+   where tx, ty are sub-pixel fractional offsets
+
+**Why Bilinear?**
+- PNG elevations are discrete pixel values (meter integers)
+- Bilinear smooths transitions, preventing visible step discontinuities
+- Sub-meter precision from Terrarium format's blue channel (1/256m resolution) preserved
+
+**Return Value**: Elevation in meters; 0 if tile not loaded
+
+### Why Objects Align Correctly
+
+**Coordinate Consistency Across All Components:**
+
+1. **Buildings**: `position.set(centroidX, terrainY, -centroidY)` in BuildingMeshFactory:186
+2. **Vegetation**: `matrix.setPosition(x, terrainY + offset, -y)` in vegetationUtils:150
+3. **Structures**: `obj.position.set(mx, terrainY + offset, -my)` in StructureMeshFactory:53
+4. **Barriers**: `mesh.position.set(midX, terrainY + offset, -midY)` in BarrierMeshFactory:49
+5. **Bridges**: `mesh.position.set(midX, terrainY + offset, -midY)` in BridgeMeshFactory:79
+
+All use the same formula: `(mercatorX, elevation, -mercatorY)`, ensuring spatial alignment.
+
+---
+
+## Performance & Optimization
+
+### Instanced Mesh for Vegetation
+
+**Problem**: A forest with 1,000 trees as individual meshes = 2,000 draw calls (trunk + canopy), significant GPU overhead.
+
+**Solution**: `InstancedMesh`
+- Single trunk geometry drawn 1,000 times with different transform matrices
+- Single canopy geometry drawn 1,000 times with different matrices + per-instance colors
+- **Result**: 2 draw calls regardless of tree count
+
+**Implementation**:
+```
+Create trunk/canopy geometries once
+Create InstancedMesh(geometry, material, 1000)
+For each tree i:
+  setMatrixAt(i, transformMatrix)      // scale + position
+  setColorAt(i, colorValue)             // per-instance color
+Update instanceMatrix.needsUpdate = true
+```
+
+**GPU Memory Impact:**
+- Geometry: ~10KB (shared)
+- Per-instance data: ~64 bytes × count (transform matrix only)
+- 1,000 trees: ~64KB instance data vs. ~10MB for individual meshes
+
+### Local Coordinate Geometry for Buildings
+
+**Problem**: Mercator coordinates at zoom 15 are ~250,000–500,000 units. Float32 has ~7 significant digits; such large coordinates lose precision in geometry vertices.
+
+**Solution**: Build geometry in local coordinates relative to polygon centroid
+```
+centroid = (261700, 6250000)  // Building in Paris
+localVertex = (vertex - centroid)       // Relative coordinates
+Create geometry in local space [−1000, +1000] range
+Position mesh at world centroid
+```
+
+**Result**: Geometry vertices maintain sub-meter precision despite large Mercator offset.
+
+### Material Sharing Strategies
+
+- **Buildings**: All walls share `MeshLambertMaterial` instances per color (palette of ~20 colors)
+- **Vegetation**: Single trunk material + single canopy material per color variation
+- **Barriers**: Single material per barrier type
+
+**GPU Memory**: Reusing materials reduces material object count by 90%+ compared to unique materials per mesh.
+
+### Tile-Based Culling
+
+- **Ring System**: Only 9 tiles loaded at a time (3×3 grid)
+- **Result**: Max ~500–2,000 visible objects at any time
+- **Comparison**: Without culling, entire world would be loaded (impossible for large datasets)
+
+---
+
+## Key Parameters & Configuration
+
+Configuration values are centralized in `src/config.ts`. Key visualization parameters:
+
+### Building Configuration
+
+| Parameter | Value | Effect |
+|---|---|---|
+| `buildingHeightDefaults['residential']` | 6m | Default house height if not tagged |
+| `buildingHeightDefaults['apartments']` | 12m | Multi-story buildings |
+| `roofColorDefaults.pitched` | #906050 (brown) | Pitched roofs (gabled, hipped, etc.) |
+| `roofColorDefaults.flat` | #a0a090 (gray) | Flat roofs |
+
+### Vegetation Configuration
+
+| Parameter | Forest | Scrub | Orchard |
+|---|---|---|---|
+| `vegetationMeshConfig.forest.densityPer100m2` | 1.0 | 4.0 | — |
+| `vegetationMeshConfig.forest.trunkHeightMin` | 8m | 0m | 3m |
+| `vegetationMeshConfig.forest.crownRadiusMax` | 5m | 2.5m | 2.5m |
+
+**Tuning Density for Performance:**
+- Forest 1.0 trees/100m² = ~40 trees per 200m×200m tile at zoom 15
+- Can increase to 2.0 for denser forests; decrease to 0.5 for sparser
+- Max 2,000 points per polygon prevents memory explosion
+
+### Structure Configuration
+
+| Structure Type | Default Height | Default Radius |
+|---|---|---|
+| `structureDefaults.tower` | 20m | 3m |
+| `structureDefaults.chimney` | 40m | 2m |
+| `structureDefaults.communications_tower` | 50m | 4m |
+| `structureDefaults.crane` | 40m | 1m |
+
+### Barrier Configuration
+
+| Parameter | Wall | City Wall | Hedge |
+|---|---|---|---|
+| Default width | 0.3m | 2.0m | 1.0m |
+| Default height | 2.0m | 6.0m | 1.5m |
+| Default color | #c0b8b0 | #c8c0b0 | #4a7030 |
+
+### Bridge Configuration
+
+| Parameter | Value |
+|---|---|
+| Deck color | #b0a898 |
+| Deck thickness | 0.5m |
+| Layer height multiplier | 5m per layer |
+| Deck margin | 2m per side (4m total overhang) |
+
+### Adjusting Visual Appearance
+
+**Example: Make trees taller**
+```typescript
+// In src/config.ts
+vegetationMeshConfig.forest.trunkHeightMax = 20  // was 15m
+```
+
+**Example: Make buildings higher**
+```typescript
+buildingHeightDefaults['residential'] = 8  // was 6m
+```
+
+**Example: Change barrier color**
+```typescript
+barrierDefaults.wall.color = '#a0a0a0'  // was #c0b8b0
+```
+
+Changes apply to all newly-loaded tiles; existing tiles retain old values until re-rendered.
+
+---
+
+## Coordinate System Reference
+
+### Quick Reference
+
+| Concept | Value | Usage |
+|---|---|---|
+| **Mercator X** | East-West position (meters) | Direct to Three.js X |
+| **Mercator Y** | North-South position (meters), increases northward | Negated to Three.js Z (Z = -Y) |
+| **Elevation** | Altitude (meters above sea level) | Direct to Three.js Y |
+| **Azimuth** | Compass bearing (0°=North, 90°=East), clockwise | Negated for Three.js rotation.y |
+
+### Z-Negation Critical Points
+
+The Z-negation (`z = -mercatorY`) is **fundamental** to the entire system:
+
+1. **Drone Movement**: Uses positive cos(azimuth) for northward movement (Mercator Y increases)
+2. **Camera Default**: Three.js default camera looks along -Z axis
+3. **Object Placement**: All meshes use `position.z = -mercatorY`
+4. **Terrain Positioning**: Terrain meshes use same formula
+
+**Verification Test**: If Z-negation is wrong, north would look like south.
+
+### Full Coordinate Transformation Formulas
+
+See `doc/coordinate-system.md` for:
+- Latitude/longitude to Mercator conversion
+- Direction vectors for all azimuths
+- Chase camera positioning
+- Complete examples with Paris coordinates
+
+---
+
+## Glossary
+
+| Term | Definition |
+|---|---|
+| **Azimuth** | Compass bearing in degrees (0°=North, clockwise positive) |
+| **Bilinear Interpolation** | Smoothing technique using 4 nearest values |
+| **Bounding Box (OBB)** | Oriented bounding box; minimal rectangle aligned with polygon axes |
+| **Centroid** | Geometric center of a polygon |
+| **Elevation Tile** | 256×256 pixel PNG in Terrarium format covering ~327m×327m area at zoom 15 |
+| **ExtrudeGeometry** | Three.js geometry that extrudes a 2D shape along the Z axis |
+| **InstancedMesh** | Three.js optimization drawing single geometry multiple times with different transforms |
+| **Mercator Projection** | Web standard map projection (EPSG:3857); distorts poles, preserves local angles |
+| **Ring System** | 3×3 grid of tiles loaded around drone position |
+| **Strategy Pattern** | Design pattern using interchangeable algorithms; used for roof shapes and vegetation types |
+| **Tapered Cylinder** | Cylinder with different top and bottom radii (e.g., chimney) |
+| **Terrarium Format** | AWS elevation PNG format; RGB channels encode elevation via formula: (R×256 + G + B/256) − 32768 |
+| **Tile Key** | Unique identifier for a tile: `"z:x:y"` (e.g., `"15:16807:11239"`) |
+| **Winding Order** | Polygon vertex order (clockwise vs. counterclockwise); affects face normals |
+| **Zoom Level** | Web Mercator parameter (15 ≈ 327m per tile at equator) |
+
+---
+
+## Related Documentation
+
+- **`doc/coordinate-system.md`**: Full coordinate system specification with detailed math
+- **`doc/data/elevations.md`**: Elevation data source, Terrarium format, sampling details
+- **`doc/architecture.md`**: System-wide architecture and component relationships
+- **`src/config.ts`**: Configuration values for all appearance parameters
+- **`src/visualization/mesh/`**: Factory implementations (source code)
+- **`src/visualization/MeshObjectManager.ts`**: Lifecycle coordination (source code)
+

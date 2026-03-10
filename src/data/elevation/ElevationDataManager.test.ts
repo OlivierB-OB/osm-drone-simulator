@@ -101,7 +101,10 @@ describe('ElevationDataManager', () => {
       });
 
       // Add some tiles to cache manually for testing
-      const cacheMap = (manager as any).tileCache as Map<string, ElevationDataTile>;
+      const cacheMap = (manager as any).tileCache as Map<
+        string,
+        ElevationDataTile
+      >;
       const testCoords: TileCoordinates = { z: 15, x: 100, y: 100 };
       const testKey = '15:100:100';
       cacheMap.set(testKey, createMockTile(testCoords));
@@ -229,7 +232,6 @@ describe('ElevationDataManager', () => {
   describe('error handling', () => {
     it('should continue loading other tiles if one fails', async () => {
       const tile1 = createMockTile({ z: 15, x: 100, y: 100 });
-      const tile2 = createMockTile({ z: 15, x: 101, y: 100 });
 
       // Simulate loading tile1 successfully
       (manager as any).tileCache.set('15:100:100', tile1);
@@ -264,7 +266,8 @@ describe('ElevationDataManager', () => {
 
   describe('cleanup and disposal', () => {
     it('should abort all pending loads on dispose', async () => {
-      const abortController = (manager as any).abortController as AbortController;
+      const abortController = (manager as any)
+        .abortController as AbortController;
       const abortSpy = vi.spyOn(abortController, 'abort');
 
       manager.dispose();
@@ -385,7 +388,9 @@ describe('ElevationDataManager', () => {
 
       // Should return null for unloaded coordinates
       const result = manager.getTileAt(100000, 6250000);
-      expect(result === null || result === undefined || result instanceof Object).toBe(true);
+      expect(
+        result === null || result === undefined || result instanceof Object
+      ).toBe(true);
     });
 
     it('should handle rapid location changes (tile boundary crossing)', async () => {

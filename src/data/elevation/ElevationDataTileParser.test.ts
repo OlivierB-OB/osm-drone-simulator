@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ElevationDataTileParser } from './ElevationDataTileParser';
 
 describe('ElevationDataTileParser', () => {
@@ -180,10 +180,22 @@ describe('ElevationDataTileParser', () => {
       // RGBA: R, G, B, A per pixel, 2×2 image
       const imageData = {
         data: new Uint8ClampedArray([
-          128, 0, 0, 255, // Pixel (0,0): RGBA
-          129, 0, 0, 255, // Pixel (0,1): RGBA
-          130, 0, 0, 255, // Pixel (1,0): RGBA
-          131, 0, 0, 255, // Pixel (1,1): RGBA
+          128,
+          0,
+          0,
+          255, // Pixel (0,0): RGBA
+          129,
+          0,
+          0,
+          255, // Pixel (0,1): RGBA
+          130,
+          0,
+          0,
+          255, // Pixel (1,0): RGBA
+          131,
+          0,
+          0,
+          255, // Pixel (1,1): RGBA
         ]),
         width: 2,
         height: 2,
@@ -269,10 +281,22 @@ describe('ElevationDataTileParser', () => {
       // 2×2 test image with known values
       const imageData = {
         data: new Uint8ClampedArray([
-          128, 0, 0, 255, // (0,0): elevation 0
-          129, 0, 0, 255, // (0,1): elevation 256
-          130, 0, 0, 255, // (1,0): elevation 512
-          131, 0, 0, 255, // (1,1): elevation 768
+          128,
+          0,
+          0,
+          255, // (0,0): elevation 0
+          129,
+          0,
+          0,
+          255, // (0,1): elevation 256
+          130,
+          0,
+          0,
+          255, // (1,0): elevation 512
+          131,
+          0,
+          0,
+          255, // (1,1): elevation 768
         ]),
         width: 2,
         height: 2,
@@ -301,10 +325,22 @@ describe('ElevationDataTileParser', () => {
       // Verify that pixels are read row-by-row (left-to-right, top-to-bottom)
       const imageData = {
         data: new Uint8ClampedArray([
-          128, 0, 0, 255, // Row 0, Col 0
-          129, 0, 0, 255, // Row 0, Col 1
-          130, 0, 0, 255, // Row 1, Col 0
-          131, 0, 0, 255, // Row 1, Col 1
+          128,
+          0,
+          0,
+          255, // Row 0, Col 0
+          129,
+          0,
+          0,
+          255, // Row 0, Col 1
+          130,
+          0,
+          0,
+          255, // Row 1, Col 0
+          131,
+          0,
+          0,
+          255, // Row 1, Col 1
         ]),
         width: 2,
         height: 2,
@@ -359,21 +395,21 @@ describe('ElevationDataTileParser', () => {
       const data = new Uint8ClampedArray(16); // 4 pixels × 4 bytes each
       // Row 0
       data[0] = 128; // (0,0) R
-      data[1] = 0;   // (0,0) G
-      data[2] = 0;   // (0,0) B
+      data[1] = 0; // (0,0) G
+      data[2] = 0; // (0,0) B
       data[3] = 255; // (0,0) A
       data[4] = 129; // (0,1) R
-      data[5] = 0;   // (0,1) G
-      data[6] = 0;   // (0,1) B
+      data[5] = 0; // (0,1) G
+      data[6] = 0; // (0,1) B
       data[7] = 255; // (0,1) A
       // Row 1
-      data[8] = 130;  // (1,0) R
-      data[9] = 0;    // (1,0) G
-      data[10] = 0;   // (1,0) B
+      data[8] = 130; // (1,0) R
+      data[9] = 0; // (1,0) G
+      data[10] = 0; // (1,0) B
       data[11] = 255; // (1,0) A
       data[12] = 131; // (1,1) R
-      data[13] = 0;   // (1,1) G
-      data[14] = 0;   // (1,1) B
+      data[13] = 0; // (1,1) G
+      data[14] = 0; // (1,1) B
       data[15] = 255; // (1,1) A
 
       const imageData = {
@@ -399,10 +435,22 @@ describe('ElevationDataTileParser', () => {
       // Test with explicit RGBA (4 bytes per pixel) in 2×2 square
       const imageData = {
         data: new Uint8ClampedArray([
-          128, 0, 0, 255, // (0,0) RGBA
-          129, 0, 0, 255, // (0,1) RGBA
-          130, 0, 0, 255, // (1,0) RGBA
-          131, 0, 0, 255, // (1,1) RGBA
+          128,
+          0,
+          0,
+          255, // (0,0) RGBA
+          129,
+          0,
+          0,
+          255, // (0,1) RGBA
+          130,
+          0,
+          0,
+          255, // (1,0) RGBA
+          131,
+          0,
+          0,
+          255, // (1,1) RGBA
         ]),
         width: 2,
         height: 2,
@@ -449,9 +497,9 @@ describe('ElevationDataTileParser', () => {
 
       // Fill with pattern: R=128, G=0, B=0, A=255 for each pixel
       for (let i = 0; i < imageData.data.length; i += 4) {
-        imageData.data[i] = 128;     // R
-        imageData.data[i + 1] = 0;   // G
-        imageData.data[i + 2] = 0;   // B
+        imageData.data[i] = 128; // R
+        imageData.data[i + 1] = 0; // G
+        imageData.data[i + 2] = 0; // B
         imageData.data[i + 3] = 255; // A
       }
 
@@ -485,7 +533,12 @@ describe('ElevationDataTileParser', () => {
 
       for (const testCase of testCases) {
         const imageData = {
-          data: new Uint8ClampedArray([testCase.r, testCase.g, testCase.b, 255]),
+          data: new Uint8ClampedArray([
+            testCase.r,
+            testCase.g,
+            testCase.b,
+            255,
+          ]),
           width: 1,
           height: 1,
         };
@@ -510,7 +563,12 @@ describe('ElevationDataTileParser', () => {
 
       for (const testCase of testCases) {
         const imageData = {
-          data: new Uint8ClampedArray([testCase.r, testCase.g, testCase.b, 255]),
+          data: new Uint8ClampedArray([
+            testCase.r,
+            testCase.g,
+            testCase.b,
+            255,
+          ]),
           width: 1,
           height: 1,
         };
@@ -536,7 +594,8 @@ describe('ElevationDataTileParser', () => {
         [255, 255, 255], // (255*256 + 255 + 255/256) - 32768 ≈ 32768
       ];
 
-      for (const [r, g, b] of testCases) {
+      for (const tc of testCases) {
+        const [r, g, b] = tc as [number, number, number];
         const expected = r * 256 + g + b / 256 - 32768;
 
         const imageData = {
