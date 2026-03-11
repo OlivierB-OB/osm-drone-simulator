@@ -39,8 +39,8 @@ export class ContextDataTileParser {
   static parseOSMData(
     osmData: Record<string, unknown>,
     // Retained for future use (bounds-based filtering, zoom-dependent detail)
-    _bounds: MercatorBounds, // eslint-disable-line @typescript-eslint/no-unused-vars
-    _zoomLevel: number // eslint-disable-line @typescript-eslint/no-unused-vars
+    _bounds: MercatorBounds,
+    _zoomLevel: number
   ): ContextDataTile['features'] {
     const features: ContextDataTile['features'] = {
       buildings: [],

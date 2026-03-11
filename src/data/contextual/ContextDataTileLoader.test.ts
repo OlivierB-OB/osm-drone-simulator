@@ -1,66 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ContextDataTileLoader } from './ContextDataTileLoader';
 import { ContextDataTileParser } from './ContextDataTileParser';
-import type { TileCoordinates } from '../elevation/types';
-import type { MercatorCoordinates } from '../../gis/types';
 
 describe('ContextDataTileLoader', () => {
-  describe('getTileCoordinates', () => {
-    it('converts Mercator coordinates to tile coordinates', () => {
-      // Paris location
-      const location: MercatorCoordinates = {
-        x: 262144,
-        y: 6250000,
-      };
-      const zoomLevel = 14;
-
-      const tile = ContextDataTileLoader.getTileCoordinates(
-        location,
-        zoomLevel
-      );
-
-      expect(tile.z).toBe(14);
-      expect(typeof tile.x).toBe('number');
-      expect(typeof tile.y).toBe('number');
-    });
-
-    it('produces different tiles for different locations', () => {
-      const location1: MercatorCoordinates = { x: 0, y: 0 };
-      const location2: MercatorCoordinates = { x: 1000000, y: 1000000 };
-
-      const tile1 = ContextDataTileLoader.getTileCoordinates(location1, 14);
-      const tile2 = ContextDataTileLoader.getTileCoordinates(location2, 14);
-
-      expect(tile1).not.toEqual(tile2);
-    });
-  });
-
-  describe('getTileMercatorBounds', () => {
-    it('calculates bounds for a tile', () => {
-      const coordinates: TileCoordinates = { z: 14, x: 8191, y: 8192 };
-
-      const bounds = ContextDataTileLoader.getTileMercatorBounds(coordinates);
-
-      expect(bounds.minX).toBeLessThan(bounds.maxX);
-      expect(bounds.minY).toBeLessThan(bounds.maxY);
-      expect(typeof bounds.minX).toBe('number');
-      expect(typeof bounds.maxX).toBe('number');
-      expect(typeof bounds.minY).toBe('number');
-      expect(typeof bounds.maxY).toBe('number');
-    });
-
-    it('adjacent tiles share boundaries', () => {
-      const tile1: TileCoordinates = { z: 14, x: 8191, y: 8192 };
-      const tile2: TileCoordinates = { z: 14, x: 8192, y: 8192 };
-
-      const bounds1 = ContextDataTileLoader.getTileMercatorBounds(tile1);
-      const bounds2 = ContextDataTileLoader.getTileMercatorBounds(tile2);
-
-      // Tile1 right edge should equal Tile2 left edge
-      expect(bounds1.maxX).toBe(bounds2.minX);
-    });
-  });
-
   describe('Visual property extraction', () => {
     // These are unit tests for the extraction logic
     // Note: Full integration tests would require mocking fetch for Overpass API

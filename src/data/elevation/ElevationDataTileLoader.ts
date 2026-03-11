@@ -1,72 +1,14 @@
-import type {
-  TileCoordinates,
-  ElevationDataTile,
-  MercatorBounds,
-} from './types';
-import type { MercatorCoordinates } from '../../gis/types';
+import type { TileCoordinates, ElevationDataTile } from './types';
 import { ElevationTilePersistenceCache } from './ElevationTilePersistenceCache';
 import { ElevationDataTileParser } from './ElevationDataTileParser';
+import { getTileMercatorBounds } from '../../gis/webMercator';
+import { loadWithPersistenceCache } from '../shared/tileLoaderUtils';
 
 /**
  * Factory for loading and parsing elevation data tiles from AWS Terrain Tiles.
  * Uses Terrarium format (PNG-encoded elevation with RGB channels).
  */
 export class ElevationDataTileLoader {
-  /**
-   * Converts Mercator coordinates to Web Mercator tile coordinates at a given zoom level.
-   * Web Mercator uses (0,0) at top-left, with x increasing right and y increasing down.
-   *
-   * @param location - Mercator coordinates in meters
-   * @param zoomLevel - Web Mercator zoom level (0-28)
-   * @returns Tile coordinates {z, x, y}
-   */
-  static getTileCoordinates(
-    location: MercatorCoordinates,
-    zoomLevel: number
-  ): TileCoordinates {
-    // Web Mercator projection parameters
-    const EARTH_RADIUS = 6378137; // meters
-    const MAX_EXTENT = EARTH_RADIUS * Math.PI; // bounds of Web Mercator
-
-    // Normalize Mercator coordinates from [-MAX_EXTENT, MAX_EXTENT] to [0, 2^zoomLevel]
-    const n = Math.pow(2, zoomLevel);
-    const x = ((location.x + MAX_EXTENT) / (2 * MAX_EXTENT)) * n;
-    const y = ((MAX_EXTENT - location.y) / (2 * MAX_EXTENT)) * n;
-
-    return {
-      z: zoomLevel,
-      x: Math.floor(x),
-      y: Math.floor(y),
-    };
-  }
-
-  /**
-   * Calculates the Mercator geographic bounds of a tile.
-   * Returns bounds in meters within the Web Mercator projection.
-   *
-   * @param coordinates - Tile coordinates
-   * @returns Mercator bounds in meters
-   */
-  static getTileMercatorBounds(coordinates: TileCoordinates): MercatorBounds {
-    const EARTH_RADIUS = 6378137; // meters
-    const MAX_EXTENT = EARTH_RADIUS * Math.PI;
-    const n = Math.pow(2, coordinates.z);
-
-    // Calculate bounds in normalized space [0, 1]
-    const minNormX = coordinates.x / n;
-    const maxNormX = (coordinates.x + 1) / n;
-    const minNormY = coordinates.y / n;
-    const maxNormY = (coordinates.y + 1) / n;
-
-    // Convert to Mercator meters
-    const minX = minNormX * 2 * MAX_EXTENT - MAX_EXTENT;
-    const maxX = maxNormX * 2 * MAX_EXTENT - MAX_EXTENT;
-    const minY = MAX_EXTENT - maxNormY * 2 * MAX_EXTENT;
-    const maxY = MAX_EXTENT - minNormY * 2 * MAX_EXTENT;
-
-    return { minX, maxX, minY, maxY };
-  }
-
   /**
    * Loads a terrain tile from AWS Terrain Tiles (Mapbox Terrain RGB format).
    * PNG-encoded elevation: elevation = (R × 256 + G + B/256) - 32768 meters
@@ -101,8 +43,7 @@ export class ElevationDataTileLoader {
       const tileSize = 256;
       const data = await ElevationDataTileParser.parsePNG(uint8Array, tileSize);
 
-      const mercatorBounds =
-        ElevationDataTileLoader.getTileMercatorBounds(coordinates);
+      const mercatorBounds = getTileMercatorBounds(coordinates);
 
       return {
         coordinates,
@@ -181,38 +122,16 @@ export class ElevationDataTileLoader {
   ): Promise<ElevationDataTile | null> {
     const tileKey = `${coordinates.z}:${coordinates.x}:${coordinates.y}`;
 
-    // Check persistent cache first (fast path)
-    try {
-      const cachedTile = await ElevationTilePersistenceCache.get(tileKey);
-      if (cachedTile) {
-        console.debug(`Cache hit for tile ${tileKey}`);
-        return cachedTile;
-      }
-    } catch (error) {
-      console.warn(
-        'Persistent cache unavailable, falling back to network',
-        error
-      );
-    }
-
-    // Fetch from network with retries if not in cache
-    const tile = await ElevationDataTileLoader.loadTileWithRetry(
-      coordinates,
-      endpoint,
-      maxRetries,
-      signal
+    return loadWithPersistenceCache(
+      tileKey,
+      ElevationTilePersistenceCache,
+      () =>
+        ElevationDataTileLoader.loadTileWithRetry(
+          coordinates,
+          endpoint,
+          maxRetries,
+          signal
+        )
     );
-
-    // Cache successful tile for future sessions
-    if (tile) {
-      try {
-        await ElevationTilePersistenceCache.set(tileKey, tile);
-      } catch (error) {
-        console.warn(`Failed to cache tile ${tileKey}:`, error);
-        // Continue anyway - cache is optional enhancement, not critical path
-      }
-    }
-
-    return tile;
   }
 }

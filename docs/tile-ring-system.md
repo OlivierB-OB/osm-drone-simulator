@@ -430,13 +430,55 @@ ContextDataManager → emit tileAdded
 
 ---
 
+---
+
+## Shared Base Class
+
+Both managers inherit from `TileDataManager<TileType>` in `src/data/shared/TileDataManager.ts`.
+This abstract class owns all ring management logic so it cannot diverge between the two implementations.
+
+### What the base class owns
+
+- **Fields:** `tileCache`, `pendingLoads`, `loadingCount`, `abortController`, `currentTileCenter`
+- **Concrete methods:** `setLocation()`, `dispose()`, `getTileKey()`, `parseTileKey()`
+- **Private logic:** `initializeTileRing()`, `updateTileRing()`, `isSameTile()`
+
+### Abstract methods (subclasses must implement)
+
+| Method | Purpose |
+|--------|---------|
+| `getConfig()` | Returns `{ zoomLevel, ringRadius, maxConcurrentLoads }` from config |
+| `getTileCoordinates(loc, zoom)` | Mercator → tile coordinates (delegates to loader static method) |
+| `loadTileAsync(key)` | Fetch one tile; respect concurrency; emit `tileAdded` on success |
+| `processQueuedTiles()` | Drain the pending queue after a load slot opens |
+
+### Optional hooks (no-op in base)
+
+| Hook | When called | ContextDataManager override |
+|------|------------|----------------------------|
+| `onTileEvicted(key)` | Per key leaving the ring (cache and pending loads) | Filters `pendingQueue` |
+| `onDispose()` | First thing in `dispose()` | Cancels timeout resolvers, empties `pendingQueue` |
+
+### How the two subclasses differ
+
+`ElevationDataManager` uses a simple scan of the full ring in `processQueuedTiles` to fill
+load slots — no separate queue structure, straightforward concurrency control.
+
+`ContextDataManager` adds a `pendingQueue` (FIFO string array) and `pendingResolvers`
+(timeout-guarded promise callbacks) to handle Overpass API rate limits and long timeouts.
+It overrides both hooks to clean up this extra state on eviction and dispose.
+
+---
+
 ## Key Files & Implementation
 
 | File | Purpose | Ring-Related Code |
 |------|---------|-------------------|
 | `src/config.ts` | Configuration | Lines 70-99: elevationConfig, contextDataConfig |
-| `src/data/elevation/ElevationDataManager.ts` | Ring orchestration | updateTileRing(), emit tileAdded/tileRemoved |
-| `src/data/contextual/ContextDataManager.ts` | Ring orchestration (OSM data) | Same pattern as ElevationDataManager |
+| `src/gis/webMercator.ts` | Shared Web Mercator math | `getTileCoordinates`, `getTileMercatorBounds` — used by both Elevation and Context loaders |
+| `src/data/shared/TileDataManager.ts` | Abstract base class | All ring logic: updateTileRing, setLocation, dispose |
+| `src/data/elevation/ElevationDataManager.ts` | Elevation ring implementation | getConfig, loadTileAsync, processQueuedTiles, getTileAt |
+| `src/data/contextual/ContextDataManager.ts` | Context ring implementation | Same + pendingQueue, pendingResolvers, getRingTiles |
 | `src/visualization/terrain/TerrainGeometryObjectManager.ts` | Mesh lifecycle | onTileAdded(), onTileRemoved() handlers |
 | `src/visualization/contextual/BuildingMeshFactory.ts` | Building mesh creation | Responds to context tile events |
 | `doc/coordinate-system.md` | Mercator to Three.js mapping | Explains Z-negation for spatial alignment |

@@ -3,12 +3,21 @@ import type { TileCoordinates } from '../elevation/types';
 import type { ContextDataTile } from './types';
 import { contextDataConfig } from '../../config';
 import { ContextDataTileLoader } from './ContextDataTileLoader';
-import { TypedEventEmitter } from '../../core/TypedEventEmitter';
+import { getTileCoordinates } from '../../gis/webMercator';
+import {
+  TileDataManager,
+  type TileManagerConfig,
+  type TileDataEvents,
+} from '../shared/TileDataManager';
 import type { Drone } from '../../drone/Drone';
 
-export type ContextDataEvents = {
-  tileAdded: { key: string; tile: ContextDataTile };
-  tileRemoved: { key: string };
+export type ContextDataEvents = TileDataEvents<ContextDataTile>;
+
+type PendingResolver = {
+  key: string;
+  timeoutId: ReturnType<typeof setTimeout>;
+  resolved: boolean;
+  resolve: (tile: ContextDataTile | null) => void;
 };
 
 /**
@@ -18,131 +27,71 @@ export type ContextDataEvents = {
  *
  * Emits `tileAdded` when a tile finishes loading and is cached.
  * Emits `tileRemoved` when a tile is evicted from the cache.
+ *
+ * NOTE: `declare` is used for fields that are accessed during super() (via abstract
+ * method dispatch). `declare` emits no JS, so the values survive the super() call
+ * without being reset by the class-field initializer under useDefineForClassFields.
  */
-export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
-  private currentTileCenter: TileCoordinates | null = null;
-  private tileCache: Map<string, ContextDataTile> = new Map();
-  private pendingQueue: string[] = [];
-  private loadPromises: Map<string, Promise<ContextDataTile | null>> =
-    new Map();
-  private loadingCount: number = 0;
-  private abortController: AbortController = new AbortController();
-  private pendingResolvers: Array<{
-    key: string;
-    timeoutId: ReturnType<typeof setTimeout>;
-    resolved: boolean;
-    resolve: (tile: ContextDataTile | null) => void;
-  }> = [];
-  private onDroneLocationChanged = (location: MercatorCoordinates) => {
-    this.setLocation(location);
-  };
+export class ContextDataManager extends TileDataManager<ContextDataTile> {
+  // `declare` + `??=` pattern: no JS emitted for these fields, so values
+  // set during super() (via loadTileAsync → processQueuedTiles) are preserved.
+  declare private pendingQueue: string[];
+  declare private pendingResolvers: PendingResolver[];
 
-  constructor(private readonly drone: Drone) {
-    super();
-
-    drone.on('locationChanged', this.onDroneLocationChanged);
-    this.initializeTileRing(drone.getLocation());
+  constructor(drone: Drone) {
+    super(drone);
   }
 
-  /**
-   * Updates the manager's location and loads/unloads tiles as needed.
-   * Called each animation frame by AnimationLoop.
-   */
-  setLocation(location: MercatorCoordinates): void {
-    const newTileCenter = ContextDataTileLoader.getTileCoordinates(
-      location,
-      contextDataConfig.zoomLevel
-    );
-
-    // Only update tiles if we've moved to a new tile
-    if (!this.isSameTile(this.currentTileCenter, newTileCenter)) {
-      this.currentTileCenter = newTileCenter;
-      this.updateTileRing();
-    }
+  protected getConfig(): TileManagerConfig {
+    return {
+      zoomLevel: contextDataConfig.zoomLevel,
+      ringRadius: contextDataConfig.ringRadius,
+      maxConcurrentLoads: contextDataConfig.maxConcurrentLoads,
+    };
   }
 
-  /**
-   * Initializes the tile ring around the initial location.
-   */
-  private initializeTileRing(location: MercatorCoordinates): void {
-    const centerTile = ContextDataTileLoader.getTileCoordinates(
-      location,
-      contextDataConfig.zoomLevel
-    );
-
-    this.currentTileCenter = centerTile;
-    this.updateTileRing();
+  protected getTileCoordinates(
+    loc: MercatorCoordinates,
+    zoom: number
+  ): TileCoordinates {
+    return getTileCoordinates(loc, zoom);
   }
 
-  /**
-   * Updates which tiles are loaded based on the current tile center.
-   * Loads new tiles at ring edges and unloads tiles outside the ring.
-   */
-  private updateTileRing(): void {
-    if (!this.currentTileCenter) return;
+  protected override onTileEvicted(key: string): void {
+    const q = this.pendingQueue;
+    if (q) this.pendingQueue = q.filter((k) => k !== key);
+  }
 
-    const center = this.currentTileCenter;
-    const radius = contextDataConfig.ringRadius;
-    const z = contextDataConfig.zoomLevel;
-
-    // Generate set of tiles that should be loaded
-    const desiredTiles = new Set<string>();
-
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        const x = center.x + dx;
-        const y = center.y + dy;
-        const key = this.getTileKey({ z, x, y });
-        desiredTiles.add(key);
-      }
+  protected override onDispose(): void {
+    this.pendingQueue = [];
+    for (const resolver of this.pendingResolvers ?? []) {
+      clearTimeout(resolver.timeoutId);
     }
-
-    // Unload tiles that are no longer needed
-    for (const [key] of this.tileCache.entries()) {
-      if (!desiredTiles.has(key)) {
-        this.tileCache.delete(key);
-        this.loadPromises.delete(key);
-        this.emit('tileRemoved', { key });
-      }
-    }
-
-    // Remove queued tiles that are no longer in the desired set
-    this.pendingQueue = this.pendingQueue.filter((key) =>
-      desiredTiles.has(key)
-    );
-
-    // Load tiles that are needed but not yet loaded
-    for (const key of desiredTiles) {
-      if (!this.tileCache.has(key) && !this.loadPromises.has(key)) {
-        this.loadTileAsync(key);
-      }
-    }
+    this.pendingResolvers = [];
   }
 
   /**
    * Loads a tile asynchronously, respecting concurrency limits.
    * Queues the tile if max concurrent loads is reached.
-   * Throttling is delegated to ContextDataTileLoader and OverpassStatusManager.
-   * Returns a promise that resolves when the tile is loaded or the load fails.
    */
-  private loadTileAsync(key: string): Promise<ContextDataTile | null> {
-    if (this.loadPromises.has(key)) {
-      return this.loadPromises.get(key)!;
+  protected loadTileAsync(key: string): void {
+    this.pendingQueue ??= [];
+    this.pendingResolvers ??= [];
+
+    if (this.pendingLoads.has(key)) {
+      return;
     }
 
     const [z, x, y] = this.parseTileKey(key);
     const coordinates = { z, x, y };
 
     const promise = new Promise<ContextDataTile | null>((resolve) => {
-      // Check if we can load now (concurrency constraint only)
       if (this.loadingCount < contextDataConfig.maxConcurrentLoads) {
         this.startLoad(key, coordinates).then(resolve);
       } else {
-        // Queue for later when a load slot opens
         this.pendingQueue.push(key);
 
-        // Set up resolver with timeout and resolved guard
-        const resolver: (typeof this.pendingResolvers)[number] = {
+        const resolver: PendingResolver = {
           key,
           resolved: false,
           timeoutId: setTimeout(() => {
@@ -164,9 +113,8 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
       }
     });
 
-    this.loadPromises.set(key, promise);
+    this.pendingLoads.set(key, promise);
     this.processQueuedTiles();
-    return promise;
   }
 
   /**
@@ -187,12 +135,11 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
         this.abortController.signal
       );
 
-      if (tile && this.loadPromises.has(key)) {
+      if (tile && this.pendingLoads.has(key)) {
         this.tileCache.set(key, tile);
         this.emit('tileAdded', { key, tile });
 
-        // Notify any pending resolvers waiting for this tile
-        const resolverIndex = this.pendingResolvers.findIndex(
+        const resolverIndex = (this.pendingResolvers ?? []).findIndex(
           (r) => r.key === key
         );
         if (resolverIndex >= 0) {
@@ -205,23 +152,22 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
       return tile;
     } finally {
       this.loadingCount--;
-      this.loadPromises.delete(key);
+      this.pendingLoads.delete(key);
       this.processQueuedTiles();
     }
   }
 
   /**
    * Processes the next tile in the pending queue if concurrency allows.
-   * Called automatically when a load completes.
    * Only starts one tile at a time to prevent thundering herd.
-   * Throttling is delegated to ContextDataTileLoader and OverpassStatusManager.
    */
-  private processQueuedTiles(): void {
+  protected processQueuedTiles(): void {
+    this.pendingQueue ??= [];
+
     if (this.pendingQueue.length === 0) {
       return;
     }
 
-    // Check if we can start another load (concurrency constraint only)
     if (this.loadingCount < contextDataConfig.maxConcurrentLoads) {
       const key = this.pendingQueue.shift();
       if (key) {
@@ -233,47 +179,6 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
   }
 
   /**
-   * Checks if two tile coordinates represent the same tile.
-   */
-  private isSameTile(
-    a: TileCoordinates | null,
-    b: TileCoordinates | null
-  ): boolean {
-    if (a === null || b === null) return a === b;
-    return a.z === b.z && a.x === b.x && a.y === b.y;
-  }
-
-  /**
-   * Converts tile coordinates to a unique string key.
-   */
-  private getTileKey(coordinates: TileCoordinates): string {
-    return `${coordinates.z}:${coordinates.x}:${coordinates.y}`;
-  }
-
-  /**
-   * Parses a tile key string into coordinates with validation.
-   * @throws Error if key format is invalid or contains non-integer values
-   */
-  private parseTileKey(key: string): [number, number, number] {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
-      throw new Error(`Invalid tile key format: "${key}". Expected "z:x:y".`);
-    }
-
-    const z = Number(parts[0]);
-    const x = Number(parts[1]);
-    const y = Number(parts[2]);
-
-    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y)) {
-      throw new Error(
-        `Tile key contains non-integer values: "${key}". Got z=${z}, x=${x}, y=${y}.`
-      );
-    }
-
-    return [z, x, y];
-  }
-
-  /**
    * Gets tiles currently in the ring (loaded or pending).
    */
   getRingTiles(): string[] {
@@ -281,35 +186,16 @@ export class ContextDataManager extends TypedEventEmitter<ContextDataEvents> {
 
     const tiles: string[] = [];
     const center = this.currentTileCenter;
-    const radius = contextDataConfig.ringRadius;
-    const z = contextDataConfig.zoomLevel;
+    const { ringRadius, zoomLevel } = this.getConfig();
 
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        const x = center.x + dx;
-        const y = center.y + dy;
-        const key = this.getTileKey({ z, x, y });
-        tiles.push(key);
+    for (let dx = -ringRadius; dx <= ringRadius; dx++) {
+      for (let dy = -ringRadius; dy <= ringRadius; dy++) {
+        tiles.push(
+          this.getTileKey({ z: zoomLevel, x: center.x + dx, y: center.y + dy })
+        );
       }
     }
 
     return tiles;
-  }
-
-  /**
-   * Aborts pending requests and clears all cached data.
-   */
-  dispose(): void {
-    this.drone.off('locationChanged', this.onDroneLocationChanged);
-    this.abortController.abort();
-    this.tileCache.clear();
-    this.pendingQueue = [];
-    this.loadPromises.clear();
-    for (const resolver of this.pendingResolvers) {
-      clearTimeout(resolver.timeoutId);
-    }
-    this.pendingResolvers = [];
-    this.loadingCount = 0;
-    this.removeAllListeners();
   }
 }

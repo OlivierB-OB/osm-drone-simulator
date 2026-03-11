@@ -2,13 +2,15 @@ import type { MercatorCoordinates } from '../../gis/types';
 import type { TileCoordinates, ElevationDataTile } from './types';
 import { elevationConfig } from '../../config';
 import { ElevationDataTileLoader } from './ElevationDataTileLoader';
-import { TypedEventEmitter } from '../../core/TypedEventEmitter';
+import { getTileCoordinates } from '../../gis/webMercator';
+import {
+  TileDataManager,
+  type TileManagerConfig,
+  type TileDataEvents,
+} from '../shared/TileDataManager';
 import type { Drone } from '../../drone/Drone';
 
-export type ElevationDataEvents = {
-  tileAdded: { key: string; tile: ElevationDataTile };
-  tileRemoved: { key: string };
-};
+export type ElevationDataEvents = TileDataEvents<ElevationDataTile>;
 
 /**
  * Manages elevation data loading and caching for geographic regions.
@@ -18,100 +20,31 @@ export type ElevationDataEvents = {
  * Emits `tileAdded` when a tile finishes loading and is cached.
  * Emits `tileRemoved` when a tile is evicted from the cache.
  */
-export class ElevationDataManager extends TypedEventEmitter<ElevationDataEvents> {
-  private currentTileCenter: TileCoordinates | null = null;
-  private tileCache: Map<string, ElevationDataTile> = new Map();
-  private pendingLoads: Map<string, Promise<ElevationDataTile | null>> =
-    new Map();
-  private loadingCount: number = 0;
-  private abortController: AbortController = new AbortController();
-  private onDroneLocationChanged = (location: MercatorCoordinates) => {
-    this.setLocation(location);
-  };
-
-  constructor(private readonly drone: Drone) {
-    super();
-    this.drone.on('locationChanged', this.onDroneLocationChanged);
-    this.initializeTileRing();
+export class ElevationDataManager extends TileDataManager<ElevationDataTile> {
+  constructor(drone: Drone) {
+    super(drone);
   }
 
-  /**
-   * Updates the manager's location and loads/unloads tiles as needed.
-   * Called each animation frame by AnimationLoop.
-   */
-  setLocation(location: MercatorCoordinates): void {
-    const newTileCenter = ElevationDataTileLoader.getTileCoordinates(
-      location,
-      elevationConfig.zoomLevel
-    );
-
-    // Only update tiles if we've moved to a new tile
-    if (!this.isSameTile(this.currentTileCenter, newTileCenter)) {
-      this.currentTileCenter = newTileCenter;
-      this.updateTileRing();
-    }
+  protected getConfig(): TileManagerConfig {
+    return {
+      zoomLevel: elevationConfig.zoomLevel,
+      ringRadius: elevationConfig.ringRadius,
+      maxConcurrentLoads: elevationConfig.maxConcurrentLoads,
+    };
   }
 
-  /**
-   * Initializes the tile ring around the initial location.
-   */
-  private initializeTileRing(): void {
-    const centerTile = ElevationDataTileLoader.getTileCoordinates(
-      this.drone.getLocation(),
-      elevationConfig.zoomLevel
-    );
-
-    this.currentTileCenter = centerTile;
-    this.updateTileRing();
-  }
-
-  /**
-   * Updates which tiles are loaded based on the current tile center.
-   * Loads new tiles at ring edges and unloads tiles outside the ring.
-   */
-  private updateTileRing(): void {
-    if (!this.currentTileCenter) return;
-
-    const center = this.currentTileCenter;
-    const radius = elevationConfig.ringRadius;
-    const z = elevationConfig.zoomLevel;
-
-    // Generate set of tiles that should be loaded
-    const desiredTiles = new Set<string>();
-
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        const x = center.x + dx;
-        const y = center.y + dy;
-        const key = this.getTileKey({ z, x, y });
-        desiredTiles.add(key);
-      }
-    }
-
-    // Unload tiles that are no longer needed
-    for (const [key] of this.tileCache.entries()) {
-      if (!desiredTiles.has(key)) {
-        this.tileCache.delete(key);
-        this.pendingLoads.delete(key);
-        this.emit('tileRemoved', { key });
-      }
-    }
-
-    // Load new tiles that are missing
-    for (const key of desiredTiles) {
-      if (!this.tileCache.has(key) && !this.pendingLoads.has(key)) {
-        this.loadTileAsync(key);
-      }
-    }
+  protected getTileCoordinates(
+    loc: MercatorCoordinates,
+    zoom: number
+  ): TileCoordinates {
+    return getTileCoordinates(loc, zoom);
   }
 
   /**
    * Loads a tile asynchronously, respecting concurrent load limits.
    */
-  private loadTileAsync(tileKey: string): void {
-    // Don't start new loads if we're at the limit
-    if (this.loadingCount >= elevationConfig.maxConcurrentLoads) {
-      // Queue will be processed as other loads complete
+  protected loadTileAsync(tileKey: string): void {
+    if (this.loadingCount >= this.getConfig().maxConcurrentLoads) {
       return;
     }
 
@@ -154,28 +87,29 @@ export class ElevationDataManager extends TypedEventEmitter<ElevationDataEvents>
   /**
    * Processes tiles waiting in the queue (respects concurrent load limit).
    */
-  private processQueuedTiles(): void {
-    if (this.loadingCount >= elevationConfig.maxConcurrentLoads) {
+  protected processQueuedTiles(): void {
+    const { maxConcurrentLoads, ringRadius, zoomLevel } = this.getConfig();
+
+    if (this.loadingCount >= maxConcurrentLoads) {
       return;
     }
 
-    // Try to load more tiles if we're below the limit
     if (!this.currentTileCenter) return;
 
     const center = this.currentTileCenter;
-    const radius = elevationConfig.ringRadius;
-    const z = elevationConfig.zoomLevel;
 
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        const x = center.x + dx;
-        const y = center.y + dy;
-        const key = this.getTileKey({ z, x, y });
+    for (let dx = -ringRadius; dx <= ringRadius; dx++) {
+      for (let dy = -ringRadius; dy <= ringRadius; dy++) {
+        const key = this.getTileKey({
+          z: zoomLevel,
+          x: center.x + dx,
+          y: center.y + dy,
+        });
 
         if (!this.tileCache.has(key) && !this.pendingLoads.has(key)) {
           this.loadTileAsync(key);
 
-          if (this.loadingCount >= elevationConfig.maxConcurrentLoads) {
+          if (this.loadingCount >= maxConcurrentLoads) {
             return;
           }
         }
@@ -184,67 +118,14 @@ export class ElevationDataManager extends TypedEventEmitter<ElevationDataEvents>
   }
 
   /**
-   * Converts tile coordinates to a unique string key for caching.
-   */
-  private getTileKey(coordinates: TileCoordinates): string {
-    return `${coordinates.z}:${coordinates.x}:${coordinates.y}`;
-  }
-
-  /**
-   * Parses a tile key string back into coordinates with validation.
-   * @throws Error if key format is invalid or contains non-integer values
-   */
-  private parseTileKey(key: string): [number, number, number] {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
-      throw new Error(`Invalid tile key format: "${key}". Expected "z:x:y".`);
-    }
-
-    const z = Number(parts[0]);
-    const x = Number(parts[1]);
-    const y = Number(parts[2]);
-
-    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y)) {
-      throw new Error(
-        `Tile key contains non-integer values: "${key}". Got z=${z}, x=${x}, y=${y}.`
-      );
-    }
-
-    return [z, x, y];
-  }
-
-  /**
-   * Checks if two tile coordinates are the same.
-   */
-  private isSameTile(
-    tile1: TileCoordinates | null,
-    tile2: TileCoordinates | null
-  ): boolean {
-    if (!tile1 || !tile2) return false;
-    return tile1.z === tile2.z && tile1.x === tile2.x && tile1.y === tile2.y;
-  }
-
-  /**
    * Returns the elevation tile covering the given Mercator coordinate, or null if not loaded.
    */
   getTileAt(mercatorX: number, mercatorY: number): ElevationDataTile | null {
-    const coords = ElevationDataTileLoader.getTileCoordinates(
+    const coords = getTileCoordinates(
       { x: mercatorX, y: mercatorY },
       elevationConfig.zoomLevel
     );
     const key = `${coords.z}:${coords.x}:${coords.y}`;
     return this.tileCache.get(key) ?? null;
-  }
-
-  /**
-   * Cleans up resources and cancels pending tile loads.
-   */
-  dispose(): void {
-    this.drone.off('locationChanged', this.onDroneLocationChanged);
-    this.abortController.abort();
-    this.tileCache.clear();
-    this.pendingLoads.clear();
-    this.loadingCount = 0;
-    this.removeAllListeners();
   }
 }

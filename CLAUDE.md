@@ -58,7 +58,8 @@ Full docs in `docs/`. See `docs/README.md` for the complete index.
 - `src/3Dviewer/` - Wrapper pattern around Three.js (Camera, Scene, Renderer) with constructor injection for testing
 - `src/core/AnimationLoop.ts` - requestAnimationFrame loop, delta time (seconds), frame synchronization
 - `src/drone/` - Drone physics (Mercator coordinates), DroneController (keyboard input, arrow keys)
-- `src/data/` - ElevationDataManager (tile caching, Web Mercator zoom, z:x:y keys, AWS Terrarium PNG), ContextDataManager (placeholder)
+- `src/gis/webMercator.ts` - Shared Web Mercator math: `getTileCoordinates`, `getTileMercatorBounds`, `EARTH_RADIUS`, `MAX_EXTENT`
+- `src/data/` - ElevationDataManager (tile caching, Web Mercator zoom, z:x:y keys, AWS Terrarium PNG), ContextDataManager; `src/data/shared/tileLoaderUtils.ts` for cache-then-load pattern
 - `src/visualization/terrain/` - TerrainGeometryObjectManager + TerrainTextureObjectManager → TerrainObjectManager → TerrainObjectFactory → Three.js meshes (orchestrated pipeline)
 - `src/visualization/DroneObject.ts` - Cone mesh representing the drone in the scene
 - `src/config.ts` - Centralized config: drone position/speed, camera chase distance/height, elevation zoom/ring/concurrency

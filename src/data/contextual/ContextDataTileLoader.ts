@@ -1,73 +1,24 @@
 import type { ContextDataTile } from './types';
 import type { TileCoordinates, MercatorBounds } from '../elevation/types';
-import type { MercatorCoordinates } from '../../gis/types';
 import { colorPalette } from '../../config';
 import { ContextTilePersistenceCache } from './ContextTilePersistenceCache';
 import { ContextDataTileParser } from './ContextDataTileParser';
+import { getTileMercatorBounds, MAX_EXTENT } from '../../gis/webMercator';
+import { loadWithPersistenceCache } from '../shared/tileLoaderUtils';
 
 /**
  * Factory for loading and parsing context data tiles from OSM Overpass API.
  * Loads geospatial features (buildings, roads, railways, etc.) for a given tile.
  */
 export class ContextDataTileLoader {
-  private static readonly EARTH_RADIUS = 6378137; // meters
-  private static readonly MAX_EXTENT =
-    ContextDataTileLoader.EARTH_RADIUS * Math.PI;
-
-  /**
-   * Converts Mercator coordinates to Web Mercator tile coordinates.
-   * Reuses the same logic as ElevationDataTileLoader.
-   *
-   * @param location - Mercator coordinates in meters
-   * @param zoomLevel - Web Mercator zoom level (0-28)
-   * @returns Tile coordinates {z, x, y}
-   */
-  static getTileCoordinates(
-    location: MercatorCoordinates,
-    zoomLevel: number
-  ): TileCoordinates {
-    const n = Math.pow(2, zoomLevel);
-    const x = ((location.x + this.MAX_EXTENT) / (2 * this.MAX_EXTENT)) * n;
-    const y = ((this.MAX_EXTENT - location.y) / (2 * this.MAX_EXTENT)) * n;
-
-    return {
-      z: zoomLevel,
-      x: Math.floor(x),
-      y: Math.floor(y),
-    };
-  }
-
-  /**
-   * Calculates the Mercator geographic bounds of a tile.
-   * Returns bounds in meters within the Web Mercator projection.
-   *
-   * @param coordinates - Tile coordinates
-   * @returns Mercator bounds in meters
-   */
-  static getTileMercatorBounds(coordinates: TileCoordinates): MercatorBounds {
-    const n = Math.pow(2, coordinates.z);
-
-    const minNormX = coordinates.x / n;
-    const maxNormX = (coordinates.x + 1) / n;
-    const minNormY = coordinates.y / n;
-    const maxNormY = (coordinates.y + 1) / n;
-
-    const minX = minNormX * 2 * this.MAX_EXTENT - this.MAX_EXTENT;
-    const maxX = maxNormX * 2 * this.MAX_EXTENT - this.MAX_EXTENT;
-    const minY = this.MAX_EXTENT - maxNormY * 2 * this.MAX_EXTENT;
-    const maxY = this.MAX_EXTENT - minNormY * 2 * this.MAX_EXTENT;
-
-    return { minX, maxX, minY, maxY };
-  }
-
   /**
    * Converts Mercator meters to latitude/longitude (decimal degrees).
    * Required for Overpass API bbox parameter.
    */
   private static mercatorToLatLng(x: number, y: number): [number, number] {
-    const lng = (x / this.MAX_EXTENT) * 180;
+    const lng = (x / MAX_EXTENT) * 180;
     const lat =
-      (Math.atan(Math.sinh((Math.PI * y) / this.MAX_EXTENT)) * 180) / Math.PI;
+      (Math.atan(Math.sinh((Math.PI * y) / MAX_EXTENT)) * 180) / Math.PI;
     return [lat, lng];
   }
 
@@ -141,7 +92,7 @@ out qt;`;
     timeout: number,
     signal?: AbortSignal
   ): Promise<ContextDataTile> {
-    const bounds = this.getTileMercatorBounds(coordinates);
+    const bounds = getTileMercatorBounds(coordinates);
     const query = this.generateOverpassQuery(bounds);
 
     try {
@@ -286,25 +237,8 @@ out qt;`;
   ): Promise<ContextDataTile | null> {
     const tileKey = `${coordinates.z}:${coordinates.x}:${coordinates.y}`;
 
-    // Try to get from persistent cache first
-    const cachedTile = await ContextTilePersistenceCache.get(tileKey);
-    if (cachedTile) {
-      return cachedTile;
-    }
-
-    // Cache miss: load from Overpass API with retry logic
-    const tile = await this.loadTileWithRetry(
-      coordinates,
-      endpoint,
-      timeout,
-      maxRetries,
-      signal
+    return loadWithPersistenceCache(tileKey, ContextTilePersistenceCache, () =>
+      this.loadTileWithRetry(coordinates, endpoint, timeout, maxRetries, signal)
     );
-    if (tile) {
-      // Store in persistent cache for future use
-      await ContextTilePersistenceCache.set(tileKey, tile);
-    }
-
-    return tile;
   }
 }

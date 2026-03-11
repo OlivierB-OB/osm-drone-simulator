@@ -410,18 +410,20 @@ Key: "elevation:15:16383:10904"
 Value: {
   data: [number][][],     // The elevation grid
   storedAt: timestamp,     // When cached
-  expiresAt: timestamp     // When to refetch (30 days)
+  expiresAt: timestamp     // When to refetch (24 hours)
 }
 ```
 
 **Benefits:**
 - Returning to same location loads instantly
 - Works offline if tiles are cached
-- No double-fetches within 30-day window
+- No double-fetches within the 24-hour window
 
 **TTL strategy:**
-- 30-day expiration handles seasonal updates (landslides, erosion)
+- 24-hour expiration balances freshness against network cost
 - Can be tuned based on accuracy requirements
+
+**Implementation:** `ElevationTilePersistenceCache` is a thin typed wrapper around the shared generic `TilePersistenceCache<ElevationDataTile>` (see `src/data/shared/TilePersistenceCache.ts`). The wrapper delegates all calls using `clearOnUpgrade: false`, which preserves the cache across schema upgrades — old elevation data remains valid even when the DB schema evolves. `ContextTilePersistenceCache` uses `clearOnUpgrade: true` to wipe stale entries whenever the schema or color definitions change.
 
 ### Graceful Degradation
 
@@ -451,10 +453,12 @@ This dedicated section covers:
 | `src/data/elevation/ElevationDataTileParser.ts` | Terrarium RGB formula + PNG decoding |
 | `src/data/elevation/ElevationDataManager.ts` | Ring management, load orchestration |
 | `src/data/elevation/ElevationDataTileLoader.ts` | Network requests, caching, retries |
+| `src/data/shared/TilePersistenceCache.ts` | Generic IndexedDB cache (shared by elevation + context) |
 | `src/visualization/mesh/util/ElevationSampler.ts` | Bilinear interpolation algorithm |
+| `src/gis/webMercator.ts` | Web Mercator math: `getTileCoordinates`, `getTileMercatorBounds` (shared by elevation + context) |
 | `src/gis/types.ts` | Mercator/Three.js coordinate conversion |
-| `doc/coordinate-system.md` | Detailed coordinate mapping strategy |
-| `doc/data/elevation-sampler.md` | ElevationSampler API and algorithm |
+| `docs/coordinate-system.md` | Detailed coordinate mapping strategy |
+| `docs/data/elevation-sampler.md` | ElevationSampler API and algorithm |
 
 ## See Also
 
