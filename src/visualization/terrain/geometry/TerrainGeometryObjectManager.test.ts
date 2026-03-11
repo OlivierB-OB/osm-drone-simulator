@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BufferGeometry } from 'three';
 import { TerrainGeometryObjectManager } from './TerrainGeometryObjectManager';
-import { TerrainGeometryObject } from './TerrainGeometryObject';
 import { TerrainGeometryFactory } from './TerrainGeometryFactory';
 import type { ElevationDataTile } from '../../../data/elevation/types';
 import type { ElevationDataManager } from '../../../data/elevation/ElevationDataManager';
@@ -41,13 +40,13 @@ describe('TerrainGeometryObjectManager', () => {
   });
 
   describe('createGeometry', () => {
-    it('should create and store geometry for a tile', () => {
+    it('should create and store geometry resource for a tile', () => {
       const tile = createMockTile('9:261:168');
 
       const result = manager.createGeometry('9:261:168', tile);
 
-      expect(result).toBeInstanceOf(TerrainGeometryObject);
-      expect(result.getTileKey()).toBe('9:261:168');
+      expect(result.tileKey).toBe('9:261:168');
+      expect(result.resource).toBeInstanceOf(BufferGeometry);
       expect(manager.getTerrainGeometryObject('9:261:168')).toBe(result);
     });
 
@@ -102,25 +101,25 @@ describe('TerrainGeometryObjectManager', () => {
   });
 
   describe('getTerrainGeometryObject', () => {
-    it('should return the terrain geometry object for a tile key', () => {
+    it('should return the geometry resource for a tile key', () => {
       const tile = createMockTile('9:261:168');
       manager.createGeometry('9:261:168', tile);
 
-      const terrainGeometry = manager.getTerrainGeometryObject('9:261:168');
+      const result = manager.getTerrainGeometryObject('9:261:168');
 
-      expect(terrainGeometry).toBeDefined();
-      expect(terrainGeometry).toBeInstanceOf(TerrainGeometryObject);
-      expect(terrainGeometry?.getTileKey()).toBe('9:261:168');
+      expect(result).toBeDefined();
+      expect(result?.tileKey).toBe('9:261:168');
+      expect(result?.resource).toBeInstanceOf(BufferGeometry);
     });
 
     it('should return undefined for non-existent tile key', () => {
-      const terrainGeometry = manager.getTerrainGeometryObject('9:999:999');
-      expect(terrainGeometry).toBeUndefined();
+      const result = manager.getTerrainGeometryObject('9:999:999');
+      expect(result).toBeUndefined();
     });
   });
 
   describe('dispose', () => {
-    it('should dispose all geometry objects', () => {
+    it('should dispose all geometry resources', () => {
       const tile1 = createMockTile('9:261:168');
       const tile2 = createMockTile('9:262:168');
       const geometry1 = manager.createGeometry('9:261:168', tile1);

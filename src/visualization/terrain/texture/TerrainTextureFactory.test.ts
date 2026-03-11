@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TerrainTextureFactory } from './TerrainTextureFactory';
-import { TerrainTextureObject } from './TerrainTextureObject';
 import * as THREE from 'three';
 import type { ContextDataTile } from '../../../data/contextual/types';
 
@@ -31,14 +30,14 @@ describe('TerrainTextureFactory', () => {
       expect(mockCanvasRenderer.renderTile).not.toHaveBeenCalled();
     });
 
-    it('should create texture object when context tile available', () => {
+    it('should create texture resource when context tile available', () => {
       const mockTile = createMockContextTile('9:261:168');
 
       const result = factory.createTexture(mockTile, '9:261:168');
 
       expect(result).not.toBeNull();
-      expect(result).toBeInstanceOf(TerrainTextureObject);
-      expect(result?.getTileKey()).toBe('9:261:168');
+      expect(result?.tileKey).toBe('9:261:168');
+      expect(result?.resource).toBeInstanceOf(THREE.Texture);
     });
 
     it('should render tile onto canvas', () => {
@@ -67,25 +66,15 @@ describe('TerrainTextureFactory', () => {
 
       const result = factory.createTexture(mockTile, '9:261:168');
 
-      expect(result?.getTexture()).toBeInstanceOf(THREE.Texture);
+      expect(result?.resource).toBeInstanceOf(THREE.Texture);
     });
 
-    it('should store texture in TerrainTextureObject', () => {
+    it('should store mercator bounds in resource', () => {
       const mockTile = createMockContextTile('9:261:168');
 
       const result = factory.createTexture(mockTile, '9:261:168');
 
-      expect(result).not.toBeNull();
-      expect(result?.getTexture()).toBeDefined();
-      expect(result?.getTexture()).toBeInstanceOf(THREE.Texture);
-    });
-
-    it('should store mercator bounds in TerrainTextureObject', () => {
-      const mockTile = createMockContextTile('9:261:168');
-
-      const result = factory.createTexture(mockTile, '9:261:168');
-
-      expect(result?.getMercatorBounds()).toEqual(mockTile.mercatorBounds);
+      expect(result?.bounds).toEqual(mockTile.mercatorBounds);
     });
 
     it('should set texture properties (filters and needsUpdate)', () => {
@@ -93,7 +82,7 @@ describe('TerrainTextureFactory', () => {
 
       const result = factory.createTexture(mockTile, '9:261:168');
 
-      const texture = result?.getTexture();
+      const texture = result?.resource;
       expect(texture?.flipY).toBe(false);
       expect(texture?.magFilter).toBe(THREE.NearestFilter);
       expect(texture?.minFilter).toBe(THREE.LinearMipmapLinearFilter);
@@ -106,9 +95,9 @@ describe('TerrainTextureFactory', () => {
       const result1 = factory.createTexture(tile1, '9:261:168');
       const result2 = factory.createTexture(tile2, '9:262:168');
 
-      expect(result1?.getTileKey()).toBe('9:261:168');
-      expect(result2?.getTileKey()).toBe('9:262:168');
-      expect(result1?.getTexture()).not.toBe(result2?.getTexture());
+      expect(result1?.tileKey).toBe('9:261:168');
+      expect(result2?.tileKey).toBe('9:262:168');
+      expect(result1?.resource).not.toBe(result2?.resource);
     });
   });
 

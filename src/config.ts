@@ -67,7 +67,15 @@ export const sceneConfig = {
   },
 };
 
-export const elevationConfig = {
+export interface TileDataConfig {
+  zoomLevel: number;
+  ringRadius: number;
+  maxConcurrentLoads: number;
+}
+
+export const elevationConfig: TileDataConfig & {
+  elevationEndpoint: string;
+} = {
   // Web Mercator zoom level for terrain tiles (13 ≈ 25m resolution per pixel)
   zoomLevel: 15,
 
@@ -81,7 +89,10 @@ export const elevationConfig = {
   elevationEndpoint: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium',
 };
 
-export const contextDataConfig = {
+export const contextDataConfig: TileDataConfig & {
+  queryTimeout: number;
+  overpassEndpoint: string;
+} = {
   // Web Mercator zoom level for context data tiles (14-15 balances detail vs. request size)
   zoomLevel: 15,
 

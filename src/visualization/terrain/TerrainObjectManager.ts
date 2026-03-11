@@ -1,19 +1,20 @@
+import { Mesh } from 'three';
 import { Scene } from '../../3Dviewer/Scene';
-import { TerrainObject } from './TerrainObject';
 import { TerrainObjectFactory } from './TerrainObjectFactory';
 import { TerrainGeometryObjectManager } from './geometry/TerrainGeometryObjectManager';
 import type { TerrainTextureObjectManager } from './texture/TerrainTextureObjectManager';
 import type { TileKey } from './geometry/types';
+import type { TileResource } from './types';
 import type { TerrainGeometryObjectManagerEvents } from './geometry/TerrainGeometryObjectManager';
 import type { TerrainTextureObjectManagerEvents } from './texture/TerrainTextureObjectManager';
 
 /**
- * Manages a collection of TerrainObject instances in the 3D scene.
+ * Manages a collection of terrain mesh resources in the 3D scene.
  * Orchestrates TerrainGeometryObjectManager and TerrainTextureObjectManager
  * to create and manage terrain objects.
  */
 export class TerrainObjectManager {
-  private readonly objects = new Map<TileKey, TerrainObject>();
+  private readonly objects = new Map<TileKey, TileResource<Mesh>>();
   private onGeometryAdded = (
     data: TerrainGeometryObjectManagerEvents['geometryAdded']
   ) => {
@@ -50,26 +51,26 @@ export class TerrainObjectManager {
 
   /**
    * Called when geometry is created for a tile.
-   * Creates terrain object and adds it to the scene.
+   * Creates terrain mesh and adds it to the scene.
    */
   handleGeometryAdded(
     data: TerrainGeometryObjectManagerEvents['geometryAdded']
   ): void {
     const { key, geometry } = data;
-    const textureObject =
+    const textureResource =
       this.textureManager?.getTerrainTextureObject(key) ?? null;
 
     const terrainObject = this.factory.createTerrainObject(
       geometry,
-      textureObject
+      textureResource
     );
     this.objects.set(key, terrainObject);
-    this.scene.add(terrainObject.getMesh());
+    this.scene.add(terrainObject.resource);
   }
 
   /**
    * Called when geometry is removed for a tile.
-   * Removes terrain object from scene and cleans up.
+   * Removes terrain mesh from scene and cleans up.
    */
   handleGeometryRemoved(
     data: TerrainGeometryObjectManagerEvents['geometryRemoved']
@@ -77,7 +78,7 @@ export class TerrainObjectManager {
     const { key } = data;
     const terrainObject = this.objects.get(key);
     if (terrainObject) {
-      this.scene.remove(terrainObject.getMesh());
+      this.scene.remove(terrainObject.resource);
       terrainObject.dispose();
       this.objects.delete(key);
     }
@@ -93,27 +94,27 @@ export class TerrainObjectManager {
     const { key, texture } = data;
     if (!this.objects.has(key)) return;
 
-    const geometryObject = this.geometryManager.getTerrainGeometryObject(key);
+    const geometryResource = this.geometryManager.getTerrainGeometryObject(key);
     const terrainObject = this.objects.get(key);
-    if (!geometryObject || !terrainObject) return;
+    if (!geometryResource || !terrainObject) return;
 
     if (!texture) return;
 
     // Swap mesh in scene
-    this.scene.remove(terrainObject.getMesh());
+    this.scene.remove(terrainObject.resource);
     terrainObject.dispose();
 
     const newTerrainObject = this.factory.createTerrainObject(
-      geometryObject,
+      geometryResource,
       texture
     );
     this.objects.set(key, newTerrainObject);
-    this.scene.add(newTerrainObject.getMesh());
+    this.scene.add(newTerrainObject.resource);
   }
 
   /**
    * Called when a texture is removed for a tile.
-   * Texture state is managed implicitly through TerrainObject lifecycle.
+   * Texture state is managed implicitly through terrain object lifecycle.
    */
   handleTextureRemoved(): void {
     // No-op
@@ -122,7 +123,7 @@ export class TerrainObjectManager {
   /**
    * Get a terrain object by its tile key
    */
-  getTerrainObject(tileKey: TileKey): TerrainObject | undefined {
+  getTerrainObject(tileKey: TileKey): TileResource<Mesh> | undefined {
     return this.objects.get(tileKey);
   }
 
@@ -136,9 +137,9 @@ export class TerrainObjectManager {
     this.textureManager.off('textureAdded', this.onTextureAdded);
     this.textureManager.off('textureRemoved', this.onTextureRemoved);
 
-    // Remove all meshes from scene and dispose TerrainObjects (mesh + material)
+    // Remove all meshes from scene and dispose terrain resources
     for (const terrainObject of this.objects.values()) {
-      this.scene.remove(terrainObject.getMesh());
+      this.scene.remove(terrainObject.resource);
       terrainObject.dispose();
     }
     this.objects.clear();

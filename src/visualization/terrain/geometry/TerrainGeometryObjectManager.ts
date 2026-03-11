@@ -1,22 +1,23 @@
 import type { ElevationDataTile } from '../../../data/elevation/types';
 import type { ElevationDataManager } from '../../../data/elevation/ElevationDataManager';
-import { TerrainGeometryObject } from './TerrainGeometryObject';
 import { TerrainGeometryFactory } from './TerrainGeometryFactory';
 import { TileObjectManager } from '../../TileObjectManager';
 import type { TileKey } from './types';
+import type { TileResource } from '../types';
+import type { BufferGeometry } from 'three';
 
 export type TerrainGeometryObjectManagerEvents = {
-  geometryAdded: { key: TileKey; geometry: TerrainGeometryObject };
+  geometryAdded: { key: TileKey; geometry: TileResource<BufferGeometry> };
   geometryRemoved: { key: TileKey };
 };
 
 /**
- * Manages a collection of TerrainGeometryObject instances that contain elevation tile geometry.
+ * Manages a collection of terrain geometry resources created from elevation tiles.
  * Listens to elevation data tile events and emits geometry events.
  */
 export class TerrainGeometryObjectManager extends TileObjectManager<
   ElevationDataTile,
-  TerrainGeometryObject,
+  TileResource<BufferGeometry>,
   TerrainGeometryObjectManagerEvents
 > {
   constructor(
@@ -29,22 +30,23 @@ export class TerrainGeometryObjectManager extends TileObjectManager<
   protected override createObject(
     key: string,
     tile: ElevationDataTile
-  ): TerrainGeometryObject {
+  ): TileResource<BufferGeometry> {
     const geometry = this.factory.createGeometry(tile);
-    return new TerrainGeometryObject(
-      key as TileKey,
-      geometry,
-      tile.mercatorBounds
-    );
+    return {
+      tileKey: key as TileKey,
+      resource: geometry,
+      bounds: tile.mercatorBounds,
+      dispose: () => geometry.dispose(),
+    };
   }
 
-  protected override disposeObject(obj: TerrainGeometryObject): void {
+  protected override disposeObject(obj: TileResource<BufferGeometry>): void {
     obj.dispose();
   }
 
   protected override onObjectAdded(
     key: string,
-    obj: TerrainGeometryObject
+    obj: TileResource<BufferGeometry>
   ): void {
     this.emit('geometryAdded', { key: key as TileKey, geometry: obj });
   }
@@ -57,7 +59,10 @@ export class TerrainGeometryObjectManager extends TileObjectManager<
    * Creates geometry for a specific elevation tile and stores it.
    * Does not emit events — event emission happens via the ElevationDataManager event handler.
    */
-  createGeometry(key: TileKey, tile: ElevationDataTile): TerrainGeometryObject {
+  createGeometry(
+    key: TileKey,
+    tile: ElevationDataTile
+  ): TileResource<BufferGeometry> {
     const obj = this.createObject(key, tile);
     this.objects.set(key, obj);
     return obj;
@@ -74,11 +79,11 @@ export class TerrainGeometryObjectManager extends TileObjectManager<
   }
 
   /**
-   * Get a terrain geometry object by its tile key.
+   * Get a terrain geometry resource by its tile key.
    */
   getTerrainGeometryObject(
     tileKey: TileKey
-  ): TerrainGeometryObject | undefined {
+  ): TileResource<BufferGeometry> | undefined {
     return this.objects.get(tileKey);
   }
 }

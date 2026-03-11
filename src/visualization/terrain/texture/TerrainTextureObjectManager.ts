@@ -1,17 +1,18 @@
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { ContextDataManager } from '../../../data/contextual/ContextDataManager';
-import type { TerrainTextureObject } from './TerrainTextureObject';
 import { TerrainTextureFactory } from './TerrainTextureFactory';
 import { TileObjectManager } from '../../TileObjectManager';
 import type { TileKey } from '../geometry/types';
+import type { TileResource } from '../types';
+import type * as THREE from 'three';
 
 export type TerrainTextureObjectManagerEvents = {
-  textureAdded: { key: TileKey; texture: TerrainTextureObject | null };
+  textureAdded: { key: TileKey; texture: TileResource<THREE.Texture> | null };
   textureRemoved: { key: TileKey };
 };
 
 /**
- * Manages a collection of TerrainTextureObject instances.
+ * Manages a collection of terrain texture resources.
  * Listens to context data tile events and emits texture events.
  *
  * Stores null for tiles where context data is unavailable, allowing
@@ -19,7 +20,7 @@ export type TerrainTextureObjectManagerEvents = {
  */
 export class TerrainTextureObjectManager extends TileObjectManager<
   ContextDataTile,
-  TerrainTextureObject | null,
+  TileResource<THREE.Texture> | null,
   TerrainTextureObjectManagerEvents
 > {
   constructor(
@@ -32,17 +33,19 @@ export class TerrainTextureObjectManager extends TileObjectManager<
   protected override createObject(
     key: string,
     tile: ContextDataTile
-  ): TerrainTextureObject | null {
+  ): TileResource<THREE.Texture> | null {
     return this.factory.createTexture(tile, key);
   }
 
-  protected override disposeObject(obj: TerrainTextureObject | null): void {
+  protected override disposeObject(
+    obj: TileResource<THREE.Texture> | null
+  ): void {
     obj?.dispose();
   }
 
   protected override onObjectAdded(
     key: string,
-    obj: TerrainTextureObject | null
+    obj: TileResource<THREE.Texture> | null
   ): void {
     this.emit('textureAdded', { key: key as TileKey, texture: obj });
   }
@@ -52,14 +55,14 @@ export class TerrainTextureObjectManager extends TileObjectManager<
   }
 
   /**
-   * Creates a texture for a tile using context data.
+   * Creates a texture resource for a tile using context data.
    * Returns null if context data is unavailable (graceful degradation).
    * Does not emit events — event emission happens via the ContextDataManager event handler.
    */
   createTexture(
     key: TileKey,
     contextTile: ContextDataTile | null
-  ): TerrainTextureObject | null {
+  ): TileResource<THREE.Texture> | null {
     const obj = this.factory.createTexture(contextTile, key);
     this.objects.set(key, obj);
     return obj;
@@ -76,11 +79,11 @@ export class TerrainTextureObjectManager extends TileObjectManager<
   }
 
   /**
-   * Get a texture object by its tile key.
+   * Get a texture resource by its tile key.
    */
   getTerrainTextureObject(
     tileKey: TileKey
-  ): TerrainTextureObject | null | undefined {
+  ): TileResource<THREE.Texture> | null | undefined {
     return this.objects.get(tileKey);
   }
 }

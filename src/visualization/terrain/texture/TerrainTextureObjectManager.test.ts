@@ -1,10 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TerrainTextureObjectManager } from './TerrainTextureObjectManager';
-import { TerrainTextureObject } from './TerrainTextureObject';
 import { TerrainTextureFactory } from './TerrainTextureFactory';
 import * as THREE from 'three';
+import type { TileResource } from '../types';
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { ContextDataManager } from '../../../data/contextual/ContextDataManager';
+
+function makeTextureResource(tileKey: string): TileResource<THREE.Texture> {
+  const texture = new THREE.CanvasTexture(document.createElement('canvas'));
+  return {
+    tileKey,
+    resource: texture,
+    bounds: { minX: 0, maxX: 1000, minY: 0, maxY: 1000 },
+    dispose: vi.fn(),
+  };
+}
 
 describe('TerrainTextureObjectManager', () => {
   let manager: TerrainTextureObjectManager;
@@ -20,11 +30,7 @@ describe('TerrainTextureObjectManager', () => {
     mockFactory = {
       createTexture: vi.fn((tile: ContextDataTile | null, tileKey: string) => {
         if (tile === null) return null;
-        return new TerrainTextureObject(
-          tileKey,
-          new THREE.CanvasTexture(document.createElement('canvas')),
-          { minX: 0, maxX: 1000, minY: 0, maxY: 1000 }
-        );
+        return makeTextureResource(tileKey);
       }),
     } as unknown as TerrainTextureFactory;
 
@@ -41,13 +47,13 @@ describe('TerrainTextureObjectManager', () => {
   });
 
   describe('createTexture', () => {
-    it('should create and store texture for a tile', () => {
+    it('should create and store texture resource for a tile', () => {
       const contextTile = createMockContextTile('9:261:168');
 
       const result = manager.createTexture('9:261:168', contextTile);
 
-      expect(result).toBeInstanceOf(TerrainTextureObject);
-      expect(result?.getTileKey()).toBe('9:261:168');
+      expect(result?.tileKey).toBe('9:261:168');
+      expect(result?.resource).toBeInstanceOf(THREE.Texture);
       expect(manager.getTerrainTextureObject('9:261:168')).toBe(result);
     });
 
@@ -73,8 +79,8 @@ describe('TerrainTextureObjectManager', () => {
 
       manager.createTexture('9:261:168', null);
 
-      const textureObject = manager.getTerrainTextureObject('9:261:168');
-      expect(textureObject).toBeNull();
+      const textureResource = manager.getTerrainTextureObject('9:261:168');
+      expect(textureResource).toBeNull();
     });
 
     it('should create multiple textures', () => {
@@ -93,8 +99,8 @@ describe('TerrainTextureObjectManager', () => {
     it('should remove and dispose texture for a tile', () => {
       const contextTile = createMockContextTile('9:261:168');
       manager.createTexture('9:261:168', contextTile);
-      const textureObj = manager.getTerrainTextureObject('9:261:168')!;
-      const disposeSpy = vi.spyOn(textureObj, 'dispose');
+      const textureResource = manager.getTerrainTextureObject('9:261:168')!;
+      const disposeSpy = vi.spyOn(textureResource!, 'dispose');
 
       manager.removeTexture('9:261:168');
 
@@ -116,33 +122,33 @@ describe('TerrainTextureObjectManager', () => {
   });
 
   describe('getTerrainTextureObject', () => {
-    it('should return texture object for a tile key', () => {
+    it('should return texture resource for a tile key', () => {
       const contextTile = createMockContextTile('9:261:168');
       manager.createTexture('9:261:168', contextTile);
 
-      const textureObject = manager.getTerrainTextureObject('9:261:168');
+      const textureResource = manager.getTerrainTextureObject('9:261:168');
 
-      expect(textureObject).toBeDefined();
-      expect(textureObject).toBeInstanceOf(TerrainTextureObject);
-      expect(textureObject?.getTileKey()).toBe('9:261:168');
+      expect(textureResource).toBeDefined();
+      expect(textureResource?.tileKey).toBe('9:261:168');
+      expect(textureResource?.resource).toBeInstanceOf(THREE.Texture);
     });
 
     it('should return null for unavailable context', () => {
       mockFactory.createTexture = vi.fn(() => null);
       manager.createTexture('9:261:168', null);
 
-      const textureObject = manager.getTerrainTextureObject('9:261:168');
-      expect(textureObject).toBeNull();
+      const textureResource = manager.getTerrainTextureObject('9:261:168');
+      expect(textureResource).toBeNull();
     });
 
     it('should return undefined for non-existent tile key', () => {
-      const textureObject = manager.getTerrainTextureObject('9:999:999');
-      expect(textureObject).toBeUndefined();
+      const textureResource = manager.getTerrainTextureObject('9:999:999');
+      expect(textureResource).toBeUndefined();
     });
   });
 
   describe('dispose', () => {
-    it('should dispose all texture objects', () => {
+    it('should dispose all texture resources', () => {
       const tile1 = createMockContextTile('9:261:168');
       const tile2 = createMockContextTile('9:262:168');
       const texture1 = manager.createTexture('9:261:168', tile1)!;

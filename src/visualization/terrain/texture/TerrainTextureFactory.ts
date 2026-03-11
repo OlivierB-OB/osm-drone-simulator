@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { TileKey } from '../geometry/types';
-import { TerrainTextureObject } from './TerrainTextureObject';
+import type { TileResource } from '../types';
 import { TerrainCanvasRenderer } from './TerrainCanvasRenderer';
 import { textureConfig } from '../../../config';
 
@@ -12,7 +12,7 @@ import { textureConfig } from '../../../config';
  * 1. Receives context tile data (buildings, roads, water, vegetation, etc.)
  * 2. Renders the data onto a canvas using TerrainCanvasRenderer
  * 3. Converts the canvas to a Three.js texture
- * 4. Wraps it in a TerrainTextureObject with metadata
+ * 4. Returns a TileResource wrapping the texture with metadata
  *
  * Returns null when context data is unavailable, allowing graceful fallback
  * to solid green material without texture overlay.
@@ -24,11 +24,11 @@ export class TerrainTextureFactory {
   ) {}
 
   /**
-   * Create a texture from a context data tile.
+   * Create a texture resource from a context data tile.
    *
    * @param contextTile - The context data tile to render, or null if unavailable
    * @param tileKey - The tile identifier ("z:x:y" format)
-   * @returns TerrainTextureObject if tile available, null if tile unavailable
+   * @returns TileResource<THREE.Texture> if tile available, null if tile unavailable
    *
    * When contextTile is null (API pending, failed, or no data), returns null.
    * This signals TerrainObjectFactory to create a mesh with solid green material.
@@ -36,7 +36,7 @@ export class TerrainTextureFactory {
   createTexture(
     contextTile: ContextDataTile | null,
     tileKey: TileKey
-  ): TerrainTextureObject | null {
+  ): TileResource<THREE.Texture> | null {
     // Graceful degradation: no texture overlay if context unavailable
     if (!contextTile) {
       return null;
@@ -63,11 +63,11 @@ export class TerrainTextureFactory {
     texture.minFilter = THREE.LinearMipmapLinearFilter; // smooth at distance
     texture.needsUpdate = true;
 
-    // Wrap in TerrainTextureObject with metadata
-    return new TerrainTextureObject(
+    return {
       tileKey,
-      texture,
-      contextTile.mercatorBounds
-    );
+      resource: texture,
+      bounds: contextTile.mercatorBounds,
+      dispose: () => texture.dispose(),
+    };
   }
 }

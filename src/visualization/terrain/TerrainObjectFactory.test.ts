@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   Mesh,
   BufferGeometry,
@@ -7,24 +7,24 @@ import {
   MeshBasicMaterial,
 } from 'three';
 import { TerrainObjectFactory } from './TerrainObjectFactory';
-import { TerrainGeometryObject } from './geometry/TerrainGeometryObject';
-import { TerrainTextureObject } from './texture/TerrainTextureObject';
+import type { TileResource } from './types';
 import { debugConfig } from '../../config';
 
 describe('TerrainObjectFactory', () => {
   let factory: TerrainObjectFactory;
-  let geometryObject: TerrainGeometryObject;
+  let geometryResource: TileResource<BufferGeometry>;
   let geometry: BufferGeometry;
   const tileKey = '9:261:168';
   const mercatorBounds = { minX: 0, maxX: 1000, minY: 0, maxY: 1000 };
 
   beforeEach(() => {
     geometry = new BufferGeometry();
-    geometryObject = new TerrainGeometryObject(
+    geometryResource = {
       tileKey,
-      geometry,
-      mercatorBounds
-    );
+      resource: geometry,
+      bounds: mercatorBounds,
+      dispose: vi.fn(),
+    };
   });
 
   describe('constructor', () => {
@@ -34,11 +34,11 @@ describe('TerrainObjectFactory', () => {
     });
 
     it('should accept optional injected constructors', () => {
-      // Verify that we can pass constructors without error
       const customFactory = new TerrainObjectFactory(Mesh, MeshPhongMaterial);
       expect(customFactory).toBeDefined();
-      const terrainObject = customFactory.createTerrainObject(geometryObject);
-      expect(terrainObject).toBeDefined();
+      const terrainResource =
+        customFactory.createTerrainObject(geometryResource);
+      expect(terrainResource).toBeDefined();
     });
   });
 
@@ -47,33 +47,33 @@ describe('TerrainObjectFactory', () => {
       factory = new TerrainObjectFactory();
     });
 
-    it('should create a TerrainObject with tile key and mesh', () => {
-      const terrainObject = factory.createTerrainObject(geometryObject);
+    it('should create a terrain resource with tile key and mesh', () => {
+      const terrainResource = factory.createTerrainObject(geometryResource);
 
-      expect(terrainObject.getTileKey()).toBe(tileKey);
-      expect(terrainObject.getMesh()).toBeDefined();
+      expect(terrainResource.tileKey).toBe(tileKey);
+      expect(terrainResource.resource).toBeDefined();
     });
 
     it('should create a mesh with the provided geometry', () => {
-      const terrainObject = factory.createTerrainObject(geometryObject);
-      const mesh = terrainObject.getMesh();
+      const terrainResource = factory.createTerrainObject(geometryResource);
 
-      expect(mesh.geometry).toBe(geometry);
+      expect(terrainResource.resource.geometry).toBe(geometry);
     });
 
     describe('material type', () => {
       const originalUseSimple = debugConfig.useSimpleTerrainMaterial;
-      let textureObject: TerrainTextureObject;
+      let textureResource: TileResource<Texture>;
       let texture: Texture;
 
       beforeEach(() => {
         (debugConfig as any).useSimpleTerrainMaterial = false;
         texture = new Texture();
-        textureObject = new TerrainTextureObject(
+        textureResource = {
           tileKey,
-          texture,
-          mercatorBounds
-        );
+          resource: texture,
+          bounds: mercatorBounds,
+          dispose: vi.fn(),
+        };
       });
 
       afterEach(() => {
@@ -81,51 +81,55 @@ describe('TerrainObjectFactory', () => {
       });
 
       it('should create a mesh with a MeshPhongMaterial when texture is provided', () => {
-        const terrainObject = factory.createTerrainObject(
-          geometryObject,
-          textureObject
+        const terrainResource = factory.createTerrainObject(
+          geometryResource,
+          textureResource
         );
-        const mesh = terrainObject.getMesh();
 
-        expect(mesh.material).toBeInstanceOf(MeshPhongMaterial);
+        expect(terrainResource.resource.material).toBeInstanceOf(
+          MeshPhongMaterial
+        );
       });
 
       it('should apply texture map to material', () => {
-        const terrainObject = factory.createTerrainObject(
-          geometryObject,
-          textureObject
+        const terrainResource = factory.createTerrainObject(
+          geometryResource,
+          textureResource
         );
-        const mesh = terrainObject.getMesh();
-        const material = mesh.material as MeshPhongMaterial;
+        const material = terrainResource.resource.material as MeshPhongMaterial;
 
         expect(material.map).toBe(texture);
       });
     });
 
     it('should create different mesh instances for each call', () => {
-      const terrainObject1 = factory.createTerrainObject(geometryObject);
-      const terrainObject2 = factory.createTerrainObject(geometryObject);
+      const resource1 = factory.createTerrainObject(geometryResource);
+      const resource2 = factory.createTerrainObject(geometryResource);
 
-      expect(terrainObject1.getMesh()).not.toBe(terrainObject2.getMesh());
+      expect(resource1.resource).not.toBe(resource2.resource);
     });
 
     it('should create different material instances for each call', () => {
-      const terrainObject1 = factory.createTerrainObject(geometryObject);
-      const terrainObject2 = factory.createTerrainObject(geometryObject);
+      const resource1 = factory.createTerrainObject(geometryResource);
+      const resource2 = factory.createTerrainObject(geometryResource);
 
-      expect(terrainObject1.getMesh().material).not.toBe(
-        terrainObject2.getMesh().material
-      );
+      expect(resource1.resource.material).not.toBe(resource2.resource.material);
     });
 
     it('should position mesh at tile center in Mercator space', () => {
-      const terrainObject = factory.createTerrainObject(geometryObject);
-      const mesh = terrainObject.getMesh();
+      const terrainResource = factory.createTerrainObject(geometryResource);
+      const mesh = terrainResource.resource;
 
       // Expected center: (0+1000)/2 = 500 for X, -500 for Z (negated Mercator Y)
       expect(mesh.position.x).toBe(500);
       expect(mesh.position.y).toBe(0);
       expect(mesh.position.z).toBe(-500);
+    });
+
+    it('should propagate bounds from geometry resource', () => {
+      const terrainResource = factory.createTerrainObject(geometryResource);
+
+      expect(terrainResource.bounds).toBe(mercatorBounds);
     });
 
     describe('debug wireframe mode', () => {
@@ -137,9 +141,8 @@ describe('TerrainObjectFactory', () => {
 
       it('should use wireframe rendering for debug material', () => {
         (debugConfig as any).useSimpleTerrainMaterial = true;
-        const terrainObject = factory.createTerrainObject(geometryObject);
-        const mesh = terrainObject.getMesh();
-        const material = mesh.material as MeshBasicMaterial;
+        const terrainResource = factory.createTerrainObject(geometryResource);
+        const material = terrainResource.resource.material as MeshBasicMaterial;
 
         expect(material.wireframe).toBe(true);
       });
