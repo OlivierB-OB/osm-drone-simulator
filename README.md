@@ -1,159 +1,326 @@
 # Drone Simulator
 
-A 3D drone simulator web application built with SolidJS, Three.js, TypeScript, Vite, ESLint, and Prettier.
+An interactive real-time 3D web application that lets you pilot a virtual drone over real-world terrain. Combines actual satellite elevation data with smooth flight physics, intuitive keyboard controls, and immersive 3D visualization.
 
-## Prerequisites
+**Live demo:** http://localhost:3000 (after running `bun run dev`)
 
-- [Bun](https://bun.com) v1.3.9 or later
+---
 
-## Getting Started
+## ✨ Features
 
-### Install Dependencies
+| Feature | Description |
+|---------|-------------|
+| **Real-World Terrain** | Fly over actual geographic locations with accurate elevation data from AWS Terrarium satellite imagery |
+| **Interactive Flight Control** | Pilot with arrow keys: forward/backward, strafe left/right, rotate heading |
+| **Dynamic Chase Camera** | Follow the drone from behind with a camera that adjusts heading as you fly |
+| **Seamless Tile Loading** | Terrain loads and unloads in a ring around the drone—no interruption to flight |
+| **Frame-Rate Independent Physics** | Consistent behavior regardless of device performance |
+| **Rich Contextual Data** | OSM (OpenStreetMap) integration: buildings, roads, water, vegetation, railways, and more |
+| **High-Precision Elevation** | Sub-meter accuracy using Terrarium PNG encoding (R×256 + G + B/256) |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Bun** (runtime & package manager) — [install](https://bun.sh)
+- **Node.js 18+** (or use Bun as your Node alternative)
+
+### Setup & Run
 
 ```bash
+# Install dependencies
 bun install
-```
 
-### Development
-
-Start the development server:
-
-```bash
+# Start dev server (http://localhost:3000)
 bun run dev
-```
 
-The app will be available at `http://localhost:3000`
+# Production preview
+bun run preview
 
-### Build
-
-Create an optimized production build:
-
-```bash
+# Production build (output: dist/)
 bun run build
 ```
 
-The output will be in the `dist/` directory.
+### Controls
 
-### Preview Production Build
+| Input | Action |
+|-------|--------|
+| `↑` / `↓` | Move forward / backward |
+| `←` / `→` | Strafe left / right |
+| `W` / `S` | Rotate heading (turn left / right) |
+| **Mouse/Camera** | Follows drone automatically |
 
-Preview the production build locally:
+---
 
-```bash
-bun run preview
+## 🏗️ Architecture
+
+### Core Systems
+
+```
+User Input (Keyboard)
+  ↓
+DroneController → Drone (Physics/Mercator Coords)
+  ↓
+AnimationLoop (requestAnimationFrame)
+  ├→ Drone Position Update
+  ├→ ElevationDataManager (tile loading)
+  ├→ ContextDataManager (OSM features)
+  └→ Terrain & Mesh Managers
+     ├→ TerrainObjectManager (geometry + texture)
+     └→ MeshObjectManager (buildings, structures)
+  ↓
+Viewer3D (Scene + Camera + Renderer)
+  ↓
+Render to Screen
 ```
 
-## Code Quality
+### Key Components
 
-### Linting
+- **`src/App.tsx`** — Orchestrates all systems (initialization, cleanup, lifecycle)
+- **`src/drone/`** — Flight physics (position, heading, velocity in Mercator coordinates)
+- **`src/core/AnimationLoop.ts`** — Frame synchronization at 60+ FPS with delta time
+- **`src/3Dviewer/`** — Three.js wrapper (Scene, Camera, Renderer) with dependency injection
+- **`src/data/elevation/`** — Real-world terrain fetching, caching, tile management
+- **`src/data/contextual/`** — OSM feature loading (buildings, roads, water, vegetation)
+- **`src/visualization/terrain/`** — Converts elevation + context data into 3D meshes and textures
+- **`src/gis/`** — Coordinate system utilities (Mercator ↔ Three.js conversion)
 
-Check for code quality issues:
+See [`doc/architecture.md`](doc/architecture.md) for the complete component diagram.
 
-```bash
-bun run lint
-```
+---
 
-Auto-fix linting issues:
-
-```bash
-bun run lint:fix
-```
-
-### Formatting
-
-Format code with Prettier:
-
-```bash
-bun run format
-```
-
-Check formatting without modifying files:
-
-```bash
-bun run format:check
-```
-
-## Architecture & Animation Frame
-
-**Core Initialization** (`src/App.tsx`):
-All systems are initialized in `onMount` and properly disposed in cleanup:
-- Viewer3D, AnimationLoop, DroneController, Drone, ElevationDataManager, TerrainGeometryObjectManager, TerrainObjectManager
-
-**Animation Frame Order**:
-1. `drone.applyMove(deltaTime)` - Update location/heading (respects drone heading)
-2. `elevationData.setLocation()` - Load/unload tiles in ring around drone
-3. `contextData.setLocation()` - Update context
-4. `terrainGeometryManager.refresh()` - Create geometry from loaded tiles (z:x:y keyed)
-5. `terrainObjectManager.refresh()` - Create/remove Three.js meshes in scene
-6. Position camera (5m above drone)
-7. `viewer3D.render()`
-
-**Key Patterns**:
-- Constructor injection: 3D wrappers accept constructor functions (not instances) for dependency injection
-- Frame-rate independent physics: delta time in seconds
-- Mercator projection: GPS coordinates mapped to Web Mercator zoom
-- Factory pattern: `createDrone()`, TerrainGeometryFactory, TerrainObjectFactory
-- Resource cleanup: all components have `dispose()` methods
-
-## Project Structure
+## 📊 Project Structure
 
 ```
 drone-simulator/
 ├── src/
-│   ├── index.tsx                 # SolidJS entry point
-│   ├── App.tsx                   # Main application component (orchestrates all systems)
-│   ├── config.ts                 # Centralized config (drone, elevation, GIS)
-│   ├── 3Dviewer/                 # Three.js rendering wrapper
-│   │   ├── Viewer3D.ts
-│   │   ├── Camera.ts
-│   │   ├── Scene.ts
-│   │   └── Renderer.ts
-│   ├── core/                     # Core systems
-│   │   └── AnimationLoop.ts      # requestAnimationFrame loop, delta time (seconds)
-│   ├── drone/                    # Drone simulation
-│   │   ├── Drone.ts              # Drone physics (Mercator coordinates)
-│   │   └── DroneController.ts    # Keyboard input (arrow keys)
-│   ├── data/                     # Data management
-│   │   ├── ElevationDataManager.ts  # Tile caching, AWS Terrarium PNG
-│   │   └── ContextDataManager.ts    # Placeholder for context data
-│   ├── gis/                      # Geographic utilities
-│   │   └── Mercator projection helpers
-│   ├── visualization/            # Terrain visualization pipeline
-│   │   └── terrain/
-│   │       ├── TerrainGeometryObjectManager.ts  # Create geometry from tiles
-│   │       └── TerrainObjectManager.ts          # Create/remove Three.js meshes
-│   └── styles.css                # Global styles
-├── index.html                    # HTML template
-├── vite.config.ts                # Vite configuration
-├── tsconfig.json                 # TypeScript configuration
-├── eslint.config.js              # ESLint configuration
-├── .prettierrc.json              # Prettier configuration
-└── package.json                  # Dependencies and scripts
+│   ├── App.tsx                    # Root component
+│   ├── config.ts                  # Centralized configuration
+│   ├── 3Dviewer/                  # Three.js wrapper classes
+│   ├── core/                      # Animation loop, event emitter
+│   ├── drone/                     # Flight physics & controller
+│   ├── gis/                       # Coordinate system (Mercator ↔ Three.js)
+│   ├── data/
+│   │   ├── elevation/             # Terrain height fetching & decoding
+│   │   └── contextual/            # OSM feature loading
+│   └── visualization/
+│       ├── terrain/               # Terrain geometry & canvas textures
+│       ├── mesh/                  # 3D objects (buildings, structures)
+│       └── drone/                 # Drone visual representation
+├── doc/                           # Comprehensive documentation (76 files)
+│   ├── architecture.md            # Component diagram & data flow
+│   ├── animation-loop.md          # 9-step frame sequence
+│   ├── coordinate-system.md       # CRITICAL: Mercator ↔ Three.js conversion
+│   ├── data/                      # Elevation & contextual data docs
+│   ├── visualization/             # Canvas rendering, mesh creation
+│   └── osm/                       # OpenStreetMap reference (50+ files)
+├── index.html                     # Vite entry point
+├── vite.config.ts                 # Vite configuration
+├── vitest.config.ts               # Test configuration
+└── package.json                   # Dependencies & scripts
 ```
 
-## Testing
+---
 
-Run tests with Vitest:
+## 🧪 Testing
 
 ```bash
-bun run test              # Run all tests
-bun run test:ui           # Interactive test UI
-bun run test:coverage     # Coverage reports
-bun run test src/drone/Drone.test.ts  # Single file
+# Run all tests (Vitest + happy-dom)
+bun run test
+
+# Interactive UI
+bun run test:ui
+
+# Coverage report
+bun run test:coverage
+
+# Single test file
+bun run test src/drone/Drone.test.ts
 ```
 
-Tests are colocated with `.test.ts` suffix and use happy-dom for DOM simulation.
+**Coverage:** ~69% statement coverage, 32 test files, 90+ tests
 
-## Tech Stack
+See [`doc/README.md#testing`](doc/README.md) for testing patterns.
 
-- **SolidJS** 1.9 - Reactive UI library
-- **Three.js** 0.160 - 3D graphics rendering
-- **TypeScript** 5.9 - Type safety
-- **Vite** 7.3 - Build tool and dev server
-- **Vitest** 4.0 - Unit testing framework
-- **ESLint** 10 - Code linting
-- **Prettier** 3.8 - Code formatting
-- **Bun** - JavaScript runtime and package manager
+---
 
-## License
+## 🛠️ Development Commands
 
-MIT
+### Quality & Formatting
+
+```bash
+# Type checking (no emit)
+bun run type-check
+
+# Linting (ESLint + TypeScript)
+bun run lint
+
+# Auto-fix ESLint issues
+bun run lint:fix
+
+# Format code (Prettier)
+bun run format
+
+# Check formatting without modifying
+bun run format:check
+```
+
+---
+
+## 📚 Documentation
+
+The `doc/` directory contains 76 comprehensive files organized by topic:
+
+### Getting Started
+- **[overview.md](doc/overview.md)** — What the simulator does and use cases
+- **[architecture.md](doc/architecture.md)** — Components, interaction flow, data pipelines
+- **[quick-reference.md](doc/README.md)** — Navigation guide to all documentation
+
+### Core Concepts
+- **[coordinate-system.md](doc/coordinate-system.md)** ⭐ **CRITICAL** — Mercator to Three.js conversion (Z-negation, azimuth mapping)
+- **[animation-loop.md](doc/animation-loop.md)** — 9-step frame sequence, timing, dependencies
+- **[tile-ring-system.md](doc/tile-ring-system.md)** — Spatial tile loading/eviction strategy
+- **[data-pipeline.md](doc/data-pipeline.md)** — Four-stage pipeline used across systems
+
+### Data Systems
+- **[data/elevations.md](doc/data/elevations.md)** — Terrain height, AWS Terrarium, precision
+- **[data/contextual.md](doc/data/contextual.md)** — OSM features, loading strategy
+- **[data/elevation-sampler.md](doc/data/elevation-sampler.md)** — Bilinear interpolation
+
+### Visualization
+- **[visualization/canvas-rendering.md](doc/visualization/canvas-rendering.md)** — OSM feature rasterization (9-layer painter's algorithm)
+- **[visualization/ground-surface.md](doc/visualization/ground-surface.md)** — Terrain mesh generation
+- **[visualization/objects.md](doc/visualization/objects.md)** — Buildings, structures, drone
+
+### Reference
+- **[osm/README.md](doc/osm/README.md)** — OpenStreetMap integration overview
+- **[osm/buildings.md](doc/osm/buildings.md)**, **[highways.md](doc/osm/highways.md)**, **[water.md](doc/osm/water.md)**, etc. — Feature-specific docs
+- **[patterns.md](doc/patterns.md)** — Observer, Factory, Dependency Injection
+- **[glossary.md](doc/glossary.md)** — Technical term definitions
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|-------|--------------|
+| **Frontend Framework** | SolidJS 1.9 |
+| **Language** | TypeScript 5.9 |
+| **3D Graphics** | Three.js 0.160 |
+| **Build Tool** | Vite 7.3 |
+| **Test Runner** | Vitest 4.0 + happy-dom |
+| **Package Manager** | Bun |
+| **Code Quality** | ESLint + Prettier |
+
+---
+
+## 🌍 Real-World Examples
+
+### Paris
+- **Coordinates:** 48.8566°N, 2.3522°E (Mercator)
+- **Terrain:** Île de France plateau, Seine river valley
+- Configure in `src/config.ts`: `dronePosition: { x: 0.5, y: 0.5 }`
+
+### Mount Everest
+- **Elevation:** 8,848 m (encoded as RGB(162,144,0) in Terrarium)
+- **Precision:** ±0.1 m (using Blue channel)
+- Navigate to high mountains for extreme elevation testing
+
+### Dead Sea
+- **Elevation:** −430 m (negative elevation)
+- **Precision test:** Validates sub-zero elevation handling
+
+---
+
+## 🏗️ Key Design Patterns
+
+### Coordinate System Consistency
+All components use the same geographic → 3D conversion:
+```
+threeX = mercator.x         // Direct
+threeY = elevation          // Direct
+threeZ = -mercator.y        // Negated (Y northward → -Z northward)
+```
+See [`doc/coordinate-system.md`](doc/coordinate-system.md) for the complete strategy.
+
+### Observer Pattern
+Event-driven updates through `TypedEventEmitter`:
+```typescript
+drone.onMove.subscribe(({position, heading}) => { /* update */ })
+elevationData.onTileAdded.subscribe(({tile}) => { /* create mesh */ })
+```
+
+### Factory Pattern
+Consistent object creation with dependency injection:
+```typescript
+const drone = createDrone(droneConfig)
+const viewer = new Viewer3D(Scene, Camera, Renderer) // Constructor classes
+```
+
+### Resource Cleanup
+All components implement `dispose()` for proper cleanup (listeners, timers, resources).
+
+---
+
+## ✅ Quality Assurance
+
+**Test Coverage:** ~69% statement coverage
+- Coordinate system validation (21 tests)
+- Async resource management (30 tests)
+- Elevation data accuracy (26 tests)
+- Drone physics & movement (18+ tests)
+- Animation loop timing (12+ tests)
+
+**Linting & Type Safety:**
+```bash
+# Check all rules + TypeScript types
+bun run lint
+
+# Auto-fix formatting issues
+bun run lint:fix
+```
+
+---
+
+## 📋 Design Philosophy
+
+The project follows these principles (see [`CLAUDE.md`](CLAUDE.md)):
+
+- **Simplicity First** — KISS principle, prefer simple solutions
+- **Separation of Concerns** — Physics, data, and visualization are independent
+- **SOLID Principles** — Single responsibility, dependency injection
+- **DRY** — Eliminate duplication through abstraction
+- **Resource Cleanup** — All components properly dispose of resources
+
+---
+
+## 🤝 Contributing
+
+1. **Read the guidelines** — See [`CLAUDE.md`](CLAUDE.md) for working together rules
+2. **Run tests** — Ensure all tests pass: `bun run test`
+3. **Check quality** — Run linting and formatting: `bun run lint && bun run format`
+4. **Document changes** — Update relevant docs in `doc/`
+5. **Follow patterns** — Use existing patterns (Observer, Factory, DI) for consistency
+
+---
+
+## 📝 License
+
+MIT — See [`LICENSE`](LICENSE) for details
+
+**Author:** Olivier BERNARD
+
+---
+
+## 🔗 See Also
+
+- **Architecture Deep Dive** — [`doc/architecture.md`](doc/architecture.md)
+- **Animation Frame Sequence** — [`doc/animation-loop.md`](doc/animation-loop.md)
+- **Coordinate System** — [`doc/coordinate-system.md`](doc/coordinate-system.md)
+- **All Documentation** — [`doc/README.md`](doc/README.md)
+- **Development Philosophy** — [`CLAUDE.md`](CLAUDE.md)
+
+---
+
+**Happy flying! 🚁**
