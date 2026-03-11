@@ -1,6 +1,7 @@
 import { BoxGeometry, MeshLambertMaterial, Mesh, type Object3D } from 'three';
 import type { BarrierVisual } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
+import { mercatorToThreeJs } from '../../../gis/types';
 import { barrierDefaults, barrierMaterialColors } from '../../../config';
 
 /**
@@ -46,7 +47,11 @@ export class BarrierMeshFactory {
 
       const geometry = new BoxGeometry(width, height, segmentLength);
       const mesh = new Mesh(geometry, material);
-      mesh.position.set(midX, terrainY + height / 2, -midY);
+      const pos = mercatorToThreeJs(
+        { x: midX, y: midY },
+        terrainY + height / 2
+      );
+      mesh.position.set(pos.x, pos.y, pos.z);
       mesh.rotation.y = -angle;
       segments.push(mesh);
     }

@@ -21,11 +21,9 @@ describe('Coordinate System Consistency', () => {
       expect(result.z).toBe(-location.y);
     });
 
-    it('TerrainObjectFactory should use identical Z-negation (line 52)', () => {
-      // From TerrainObjectFactory.ts:52
-      // mesh.position.set(centerX, 0, -centerZ);
-      // where centerZ is computed from Mercator bounds
-      // This verifies -centerZ = -(mercator.y) uses same formula
+    it('TerrainObjectFactory should use identical Z-negation (uses mercatorToThreeJs())', () => {
+      // TerrainObjectFactory calls mercatorToThreeJs() to position the mesh
+      // This verifies the formula produces z = -(mercator.y)
 
       const bounds = { minY: 1000, maxY: 3000, minX: 5000, maxX: 7000 };
       const centerX = (bounds.minX + bounds.maxX) / 2;
@@ -40,10 +38,8 @@ describe('Coordinate System Consistency', () => {
       expect(meshZ).toBe(result.z);
     });
 
-    it('BuildingMeshFactory should use identical Z-negation (lines 180, 186)', () => {
-      // From BuildingMeshFactory.ts:180 and 186
-      // group.position.set(centroid[0], worldY, -centroid[1]);
-      // wallMesh.position.set(centroid[0], worldY, -centroid[1]);
+    it('BuildingMeshFactory should use identical Z-negation (uses mercatorToThreeJs())', () => {
+      // BuildingMeshFactory calls mercatorToThreeJs() for both group and wallMesh positions
       // where centroid[1] is Mercator Y
 
       const centroid: [number, number] = [261763, 6250047]; // Mercator X, Y

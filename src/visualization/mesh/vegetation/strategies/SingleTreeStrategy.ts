@@ -12,6 +12,7 @@ import type {
   Point,
 } from '../../../../data/contextual/types';
 import type { ElevationSampler } from '../../util/ElevationSampler';
+import { mercatorToThreeJs } from '../../../../gis/types';
 import type { IVegetationStrategy } from './types';
 import {
   TRUNK_COLOR,
@@ -60,7 +61,8 @@ export class SingleTreeStrategy implements IVegetationStrategy {
       trunkHeight + (isNeedle ? (treeHeight - trunkHeight) / 2 : crownRadius);
     group.add(canopy);
 
-    group.position.set(x, terrainY, -y);
+    const pos = mercatorToThreeJs({ x, y }, terrainY);
+    group.position.set(pos.x, pos.y, pos.z);
     return [group];
   }
 }

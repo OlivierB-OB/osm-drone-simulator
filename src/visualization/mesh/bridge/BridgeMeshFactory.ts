@@ -1,6 +1,7 @@
 import { BoxGeometry, MeshLambertMaterial, Mesh, type Object3D } from 'three';
 import type { RoadVisual, RailwayVisual } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
+import { mercatorToThreeJs } from '../../../gis/types';
 
 const BRIDGE_COLOR = '#b0a898';
 const DECK_THICKNESS = 0.5;
@@ -76,7 +77,11 @@ export class BridgeMeshFactory {
         segmentLength
       );
       const mesh = new Mesh(geometry, this.material);
-      mesh.position.set(midX, terrainY + layerOffset, -midY);
+      const pos = mercatorToThreeJs(
+        { x: midX, y: midY },
+        terrainY + layerOffset
+      );
+      mesh.position.set(pos.x, pos.y, pos.z);
       mesh.rotation.y = -angle;
       segments.push(mesh);
     }

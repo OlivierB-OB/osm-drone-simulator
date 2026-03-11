@@ -9,6 +9,7 @@ import {
 } from 'three';
 import type { BuildingVisual, Polygon } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
+import { mercatorToThreeJs } from '../../../gis/types';
 import { buildingHeightDefaults, roofColorDefaults } from '../../../config';
 import {
   RoofGeometryFactory,
@@ -177,13 +178,18 @@ export class BuildingMeshFactory {
           const group = new Group();
           group.add(wallMesh);
           group.add(roofMesh);
-          group.position.set(centroid[0], worldY, -centroid[1]);
+          const pos = mercatorToThreeJs(
+            { x: centroid[0], y: centroid[1] },
+            worldY
+          );
+          group.position.set(pos.x, pos.y, pos.z);
           return group;
         }
       }
 
       // Flat roof or roof geometry failed — return single mesh
-      wallMesh.position.set(centroid[0], worldY, -centroid[1]);
+      const pos = mercatorToThreeJs({ x: centroid[0], y: centroid[1] }, worldY);
+      wallMesh.position.set(pos.x, pos.y, pos.z);
       return wallMesh;
     } catch {
       // Skip degenerate polygons (self-intersecting, etc.)

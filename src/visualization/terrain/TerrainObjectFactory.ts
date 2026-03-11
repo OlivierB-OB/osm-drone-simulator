@@ -1,5 +1,6 @@
 import { Mesh, MeshPhongMaterial, MeshBasicMaterial } from 'three';
 import { debugConfig } from '../../config';
+import { mercatorToThreeJs } from '../../gis/types';
 import { TerrainObject } from './TerrainObject';
 import { TerrainGeometryObject } from './geometry/TerrainGeometryObject';
 import type { TerrainTextureObject } from './texture/TerrainTextureObject';
@@ -44,12 +45,11 @@ export class TerrainObjectFactory {
       material
     );
 
-    // Position mesh at tile center in Mercator space
-    // Negate Z-coordinate to match camera coordinate system (Mercator Y → -Z)
     const bounds = geometryObject.getMercatorBounds();
     const centerX = (bounds.minX + bounds.maxX) / 2;
-    const centerZ = (bounds.minY + bounds.maxY) / 2;
-    mesh.position.set(centerX, 0, -centerZ);
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    const pos = mercatorToThreeJs({ x: centerX, y: centerY }, 0);
+    mesh.position.set(pos.x, pos.y, pos.z);
 
     return new TerrainObject(geometryObject.getTileKey(), mesh);
   }

@@ -460,11 +460,19 @@ describe('ElevationDataManager', () => {
         setTimeout(() => reject(new Error('aborted')), 10);
       });
 
+      // Catch the rejection to prevent unhandled error during teardown
+      loadPromise.catch(() => {
+        // Expected rejection, ignore
+      });
+
       pendingLoads.set('test-tile', loadPromise);
       manager.dispose();
 
       // Should clean up even with pending rejected promise
       expect(pendingLoads.size).toBe(0);
+
+      // Wait for setTimeout to complete before test finishes
+      await new Promise((resolve) => setTimeout(resolve, 15));
     });
   });
 });
