@@ -8,6 +8,8 @@ import {
   Color,
   type Object3D,
 } from 'three';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { point } from '@turf/helpers';
 import type { Polygon } from '../../../../data/contextual/types';
 import type { ElevationSampler } from '../../util/ElevationSampler';
 
@@ -83,29 +85,13 @@ export function distributeGridInPolygon(
         py += (seededRandom(seed + 3) - 0.5) * effectiveSpacingY * 0.8;
       }
 
-      if (pointInPolygon(px, py, ring)) {
+      if (booleanPointInPolygon(point([px, py]), polygon)) {
         points.push([px, py]);
       }
     }
   }
 
   return points;
-}
-
-export function pointInPolygon(
-  x: number,
-  y: number,
-  ring: [number, number][]
-): boolean {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i]!;
-    const [xj, yj] = ring[j]!;
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
 }
 
 export function createInstancedTrees(

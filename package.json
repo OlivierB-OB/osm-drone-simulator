@@ -40,6 +40,9 @@
   },
   "type": "module",
   "dependencies": {
+    "@turf/boolean-point-in-polygon": "^7.3.4",
+    "@turf/centroid": "^7.3.4",
+    "@turf/helpers": "^7.3.4",
     "solid-js": "^1.9.11",
     "three": "^0.160.0"
   }
