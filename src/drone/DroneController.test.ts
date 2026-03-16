@@ -98,17 +98,21 @@ describe('DroneController', () => {
   });
 
   describe('Mouse Input', () => {
-    it('should listen to mousemove events on container', () => {
+    it('should listen to mousemove events on container during drag', () => {
       const rotateSpy = vi.spyOn(drone, 'rotateAzimuth');
 
-      // Set baseline position
-      const event = new MouseEvent('mousemove', { clientX: 100 });
+      // Start drag (mousedown at clientX: 100)
+      let event = new MouseEvent('mousedown', { clientX: 100 });
+      container.dispatchEvent(event);
+
+      // Set baseline position during drag
+      event = new MouseEvent('mousemove', { clientX: 100 });
       container.dispatchEvent(event);
 
       // First real movement should trigger rotation
       rotateSpy.mockClear();
-      const rightEvent = new MouseEvent('mousemove', { clientX: 150 });
-      container.dispatchEvent(rightEvent);
+      event = new MouseEvent('mousemove', { clientX: 150 });
+      container.dispatchEvent(event);
       // Movement from 100 to 150 = 50px * mouseSensitivity
       expect(rotateSpy).toHaveBeenCalledWith(50 * droneConfig.mouseSensitivity);
     });
@@ -116,8 +120,12 @@ describe('DroneController', () => {
     it('should detect left mouse movement and rotate counter-clockwise', () => {
       const rotateSpy = vi.spyOn(drone, 'rotateAzimuth');
 
+      // Start drag
+      let event = new MouseEvent('mousedown', { clientX: 100 });
+      container.dispatchEvent(event);
+
       // Set baseline
-      let event = new MouseEvent('mousemove', { clientX: 100 });
+      event = new MouseEvent('mousemove', { clientX: 100 });
       container.dispatchEvent(event);
 
       rotateSpy.mockClear();
@@ -135,8 +143,12 @@ describe('DroneController', () => {
     it('should detect right mouse movement and rotate clockwise', () => {
       const rotateSpy = vi.spyOn(drone, 'rotateAzimuth');
 
+      // Start drag
+      let event = new MouseEvent('mousedown', { clientX: 100 });
+      container.dispatchEvent(event);
+
       // Set baseline
-      let event = new MouseEvent('mousemove', { clientX: 100 });
+      event = new MouseEvent('mousemove', { clientX: 100 });
       container.dispatchEvent(event);
 
       rotateSpy.mockClear();

@@ -1,8 +1,5 @@
 import type { Object3D } from 'three';
-import type {
-  VegetationVisual,
-  LineString,
-} from '../../../../data/contextual/types';
+import type { VegetationVisual } from '../../../../data/contextual/types';
 import type { ElevationSampler } from '../../util/ElevationSampler';
 import { vegetationMeshConfig } from '../../../../config';
 import type { IVegetationStrategy } from './types';
@@ -17,7 +14,7 @@ export class TreeRowStrategy implements IVegetationStrategy {
 
   create(veg: VegetationVisual): Object3D[] {
     if (veg.geometry.type !== 'LineString') return [];
-    const coords = (veg.geometry as LineString).coordinates;
+    const coords = veg.geometry.coordinates as [number, number][];
     if (coords.length < 2) return [];
 
     const config = vegetationMeshConfig.treeRow;

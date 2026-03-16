@@ -1,6 +1,6 @@
 import type { ContextDataTile, RailwayVisual, HexColor } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { railwaySpec } from '../../../config';
+import type { LineString } from 'geojson';
 
 function getRailwaySpecForType(type: string): {
   widthMeters: number;
@@ -25,15 +25,14 @@ function getTrackCount(gauge?: string): number {
 export function classifyRailway(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: LineString,
   features: ContextDataTile['features']
 ): void {
-  if (!geometry.line) return;
   const railwayType = tags.railway!.toLowerCase();
   const spec = getRailwaySpecForType(railwayType);
   const railway: RailwayVisual = {
     id,
-    geometry: geometry.line,
+    geometry,
     type: railwayType,
     trackCount: getTrackCount(tags.gauge),
     widthMeters: spec.widthMeters,

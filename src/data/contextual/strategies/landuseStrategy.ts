@@ -1,6 +1,6 @@
 import type { ContextDataTile, LanduseVisual } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { groundColors } from '../../../config';
+import type { Polygon } from 'geojson';
 
 export const LANDUSE_TYPES = new Set([
   'grassland',
@@ -46,12 +46,10 @@ export const NATURAL_LANDUSE_TYPES = new Set([
 export function classifyLanduse(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon,
   features: ContextDataTile['features'],
   isNatural: boolean
 ): void {
-  if (!geometry.polygon) return;
-
   const landuseColors = groundColors.landuse as Record<
     string,
     string | undefined
@@ -61,7 +59,7 @@ export function classifyLanduse(
     const naturalType = tags.natural!;
     const landuse: LanduseVisual = {
       id,
-      geometry: geometry.polygon,
+      geometry,
       type: naturalType,
       color: landuseColors[naturalType] ?? groundColors.default,
     };
@@ -75,7 +73,7 @@ export function classifyLanduse(
           : (tags.landuse ?? 'other');
     const landuse: LanduseVisual = {
       id,
-      geometry: geometry.polygon,
+      geometry,
       type: luType,
       color: landuseColors[luType] ?? groundColors.default,
     };

@@ -10,7 +10,7 @@ import {
 } from 'three';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { point } from '@turf/helpers';
-import type { Polygon } from '../../../../data/contextual/types';
+import type { Polygon } from 'geojson';
 import type { ElevationSampler } from '../../util/ElevationSampler';
 
 export const TRUNK_COLOR = '#6b4226';
@@ -53,7 +53,7 @@ export function distributeGridInPolygon(
     maxX = -Infinity;
   let minY = Infinity,
     maxY = -Infinity;
-  for (const [x, y] of ring) {
+  for (const [x, y] of ring as [number, number][]) {
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;

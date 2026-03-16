@@ -1,4 +1,5 @@
 import type { Object3D } from 'three';
+import centroid from '@turf/centroid';
 import type { StructureVisual } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
 import { structureDefaults } from '../../../config';
@@ -56,18 +57,11 @@ export class StructureMeshFactory {
 
   private getPosition(structure: StructureVisual): [number, number] {
     if (structure.geometry.type === 'Point') {
-      return structure.geometry.coordinates;
+      return structure.geometry.coordinates as [number, number];
     }
-    // Polygon: use centroid
-    const ring = structure.geometry.coordinates[0];
-    if (!ring || ring.length < 2) return [0, 0];
-    let sx = 0,
-      sy = 0;
-    const n = ring.length - 1;
-    for (let i = 0; i < n; i++) {
-      sx += ring[i]![0];
-      sy += ring[i]![1];
-    }
-    return [sx / n, sy / n];
+    return centroid(structure.geometry).geometry.coordinates as [
+      number,
+      number,
+    ];
   }
 }

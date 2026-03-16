@@ -1,6 +1,6 @@
 import type { ContextDataTile, AerowayVisual } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { groundColors } from '../../../config';
+import type { LineString, Point, Polygon } from 'geojson';
 
 export const AEROWAY_TYPES = new Set([
   'aerodrome',
@@ -14,7 +14,7 @@ export const AEROWAY_TYPES = new Set([
 export function classifyAeroway(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon | LineString | Point,
   features: ContextDataTile['features']
 ): void {
   const aerowayType = tags.aeroway!;
@@ -27,11 +27,10 @@ export function classifyAeroway(
     taxiway: 23,
     taxilane: 12,
   };
-  const geom = geometry.polygon ?? geometry.line ?? geometry.point;
-  if (!geom) return;
+
   const aeroway: AerowayVisual = {
     id,
-    geometry: geom,
+    geometry,
     type: aerowayType,
     color: aerowayColors[aerowayType] ?? groundColors.aeroways.aerodrome,
     widthMeters: aerowayLineWidthsMeters[aerowayType]!,

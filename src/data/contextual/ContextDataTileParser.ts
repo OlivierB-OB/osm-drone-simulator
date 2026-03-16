@@ -1,13 +1,7 @@
-import type {
-  ContextDataTile,
-  Point,
-  LineString,
-  Polygon,
-  BuildingVisual,
-} from './types';
+import type { Point, LineString, Polygon } from 'geojson';
+import type { ContextDataTile, BuildingVisual } from './types';
 import type { MercatorBounds } from '../elevation/types';
 import { latLngToMercator } from './strategies/parserUtils';
-import type { ClassifiedGeometry } from './strategies/parserUtils';
 import booleanContains from '@turf/boolean-contains';
 import { classifyBuilding } from './strategies/buildingStrategy';
 import { classifyRoad } from './strategies/roadStrategy';
@@ -25,6 +19,7 @@ import {
   STRUCTURE_TYPES,
 } from './strategies/structureStrategy';
 import { classifyBarrier, BARRIER_TYPES } from './strategies/barrierStrategy';
+import { lineString, point, polygon } from '@turf/helpers';
 
 /**
  * Parser for OSM (OpenStreetMap) data tiles.
@@ -112,17 +107,19 @@ export class ContextDataTileParser {
   private static classifyElement(
     id: string,
     tags: Record<string, string>,
-    geometry: ClassifiedGeometry,
+    geometry: Point | LineString | Polygon,
     features: ContextDataTile['features']
   ): void {
     if (tags.building || tags['building:part']) {
       classifyBuilding(id, tags, geometry, features);
     } else if (tags.highway) {
       // Roads require line geometry; skip point nodes (highway=crossing, etc.)
-      if (geometry.line) classifyRoad(id, tags, geometry, features);
+      if (geometry.type === 'LineString')
+        classifyRoad(id, tags, geometry, features);
     } else if (tags.railway) {
       // Railways require line geometry; skip point nodes
-      if (geometry.line) classifyRailway(id, tags, geometry, features);
+      if (geometry.type === 'LineString')
+        classifyRailway(id, tags, geometry, features);
     } else if (
       tags.waterway ||
       tags['natural'] === 'water' ||
@@ -132,7 +129,7 @@ export class ContextDataTileParser {
       tags.landuse === 'water'
     ) {
       // Water requires line or polygon; skip point nodes (waterway=weir, etc.)
-      if (geometry.line || geometry.polygon)
+      if (geometry.type === 'LineString' || geometry.type === 'Polygon')
         classifyWater(id, tags, geometry, features);
     } else if (tags.aeroway && AEROWAY_TYPES.has(tags.aeroway)) {
       classifyAeroway(id, tags, geometry, features);
@@ -142,10 +139,12 @@ export class ContextDataTileParser {
       tags.power === 'pole' ||
       tags.aerialway === 'pylon'
     ) {
-      classifyStructure(id, tags, geometry, features);
+      if (geometry.type === 'Polygon' || geometry.type === 'Point')
+        classifyStructure(id, tags, geometry, features);
     } else if (tags.barrier && BARRIER_TYPES.has(tags.barrier)) {
       // Barriers require line geometry; skip point nodes
-      if (geometry.line) classifyBarrier(id, tags, geometry, features);
+      if (geometry.type === 'LineString')
+        classifyBarrier(id, tags, geometry, features);
     } else if (tags.landuse === 'forest') {
       classifyVegetation(id, tags, geometry, features, true);
     } else if (
@@ -153,9 +152,11 @@ export class ContextDataTileParser {
       tags.leisure === 'park' ||
       tags.leisure === 'garden'
     ) {
-      classifyLanduse(id, tags, geometry, features, false);
+      if (geometry.type === 'Polygon')
+        classifyLanduse(id, tags, geometry, features, false);
     } else if (tags.natural && NATURAL_LANDUSE_TYPES.has(tags.natural)) {
-      classifyLanduse(id, tags, geometry, features, true);
+      if (geometry.type === 'Polygon')
+        classifyLanduse(id, tags, geometry, features, true);
     } else if (tags.natural) {
       classifyVegetation(id, tags, geometry, features, false);
     }
@@ -172,9 +173,7 @@ export class ContextDataTileParser {
     const id = String(element.id);
     const tags = (element.tags as Record<string, string>) || {};
     const nodes = (element.nodes as number[]) || [];
-    const geometry = element.geometry as
-      | Array<{ lat: number; lon: number }>
-      | undefined;
+    const geom = element.geometry as { lat: number; lon: number }[] | undefined;
 
     if (Object.keys(tags).length === 0) return;
 
@@ -187,11 +186,7 @@ export class ContextDataTileParser {
       return;
     }
 
-    const coordinates = this.buildLineStringCoordinates(
-      nodes,
-      geometry,
-      nodeMap
-    );
+    const coordinates = this.buildLineStringCoordinates(nodes, geom, nodeMap);
     if (coordinates.length === 0) return;
 
     // Detect closed ring: prefer node-ID equality (authoritative per OSM spec),
@@ -207,17 +202,11 @@ export class ContextDataTileParser {
           firstCoord[0] === lastCoord[0] &&
           firstCoord[1] === lastCoord[1];
 
-    const line: LineString = { type: 'LineString', coordinates };
-    const polygon: Polygon | null = isClosed
-      ? { type: 'Polygon', coordinates: [coordinates] }
-      : null;
+    const geometry = isClosed
+      ? polygon([coordinates]).geometry
+      : lineString(coordinates).geometry;
 
-    this.classifyElement(
-      id,
-      tags,
-      { line, polygon, point: null, isClosed },
-      features
-    );
+    this.classifyElement(id, tags, geometry, features);
   }
 
   /**
@@ -236,14 +225,9 @@ export class ContextDataTileParser {
     if (typeof lat !== 'number' || typeof lng !== 'number') return;
 
     const [x, y] = latLngToMercator(lat, lng);
-    const point: Point = { type: 'Point', coordinates: [x, y] };
+    const geometry = point([x, y]).geometry;
 
-    this.classifyElement(
-      id,
-      tags,
-      { line: null, polygon: null, point, isClosed: false },
-      features
-    );
+    this.classifyElement(id, tags, geometry, features);
   }
 
   /**
@@ -295,17 +279,9 @@ export class ContextDataTileParser {
       .map((ref) => this.assembleRing([ref], wayMap))
       .filter((r): r is [number, number][] => r !== null && r.length >= 4);
 
-    const polygon: Polygon = {
-      type: 'Polygon',
-      coordinates: [outerRing, ...innerRings],
-    };
+    const geometry = polygon([outerRing, ...innerRings]).geometry;
 
-    this.classifyElement(
-      id,
-      tags,
-      { line: null, polygon, point: null, isClosed: true },
-      features
-    );
+    this.classifyElement(id, tags, geometry, features);
   }
 
   /**
@@ -386,9 +362,7 @@ export class ContextDataTileParser {
 
     for (const part of parts) {
       for (const parent of nonParts) {
-        if (
-          booleanContains(parent.geometry as Polygon, part.geometry as Polygon)
-        ) {
+        if (booleanContains(parent.geometry, part.geometry)) {
           parent.hasParts = true;
           break;
         }

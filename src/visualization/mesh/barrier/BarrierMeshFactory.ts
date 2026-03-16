@@ -20,7 +20,7 @@ export class BarrierMeshFactory {
   }
 
   private createBarrierMeshes(barrier: BarrierVisual): Mesh[] {
-    const coords = barrier.geometry.coordinates;
+    const coords = barrier.geometry.coordinates as [number, number][];
     if (coords.length < 2) return [];
 
     const defaults = barrierDefaults[barrier.type];

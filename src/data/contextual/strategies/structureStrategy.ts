@@ -1,6 +1,6 @@
 import type { ContextDataTile, StructureVisual } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { structureDefaults } from '../../../config';
+import type { Point, Polygon } from 'geojson';
 
 const STRUCTURE_TYPES = new Set([
   'tower',
@@ -32,7 +32,7 @@ export { STRUCTURE_TYPES };
 export function classifyStructure(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon | Point,
   features: ContextDataTile['features']
 ): void {
   const structureType = getStructureType(tags);
@@ -41,12 +41,9 @@ export function classifyStructure(
   const defaults = structureDefaults[structureType];
   if (!defaults) return;
 
-  const geom = geometry.point ?? geometry.polygon;
-  if (!geom) return;
-
   const structure: StructureVisual = {
     id,
-    geometry: geom,
+    geometry,
     type: structureType,
     height: tags.height ? parseFloat(tags.height) : undefined,
     diameter:

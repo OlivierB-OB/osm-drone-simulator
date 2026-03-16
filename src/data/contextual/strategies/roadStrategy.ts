@@ -1,6 +1,6 @@
 import type { ContextDataTile, RoadVisual, HexColor } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { roadSpec, surfaceColors } from '../../../config';
+import type { LineString } from 'geojson';
 
 function getRoadWidthMeters(type: string): number {
   return (
@@ -26,14 +26,13 @@ function getRoadSurfaceColor(surface?: string): HexColor | undefined {
 export function classifyRoad(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: LineString,
   features: ContextDataTile['features']
 ): void {
-  if (!geometry.line) return;
   const highwayType = tags.highway!.toLowerCase();
   const road: RoadVisual = {
     id,
-    geometry: geometry.line,
+    geometry,
     type: tags.highway!,
     widthMeters: getRoadWidthMeters(highwayType),
     laneCount: tags.lanes ? parseInt(tags.lanes, 10) : undefined,

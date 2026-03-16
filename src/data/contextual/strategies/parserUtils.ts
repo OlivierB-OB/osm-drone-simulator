@@ -1,18 +1,5 @@
-import type { LineString, Point, Polygon } from '../types';
-
 const EARTH_RADIUS = 6378137; // meters
 const MAX_EXTENT = EARTH_RADIUS * Math.PI;
-
-/**
- * Uniform geometry input for all strategy classifiers.
- * Prepared by the main parser from ways, nodes, or relations.
- */
-export interface ClassifiedGeometry {
-  line: LineString | null;
-  polygon: Polygon | null;
-  point: Point | null;
-  isClosed: boolean;
-}
 
 /**
  * Converts latitude/longitude (decimal degrees) to Mercator meters.

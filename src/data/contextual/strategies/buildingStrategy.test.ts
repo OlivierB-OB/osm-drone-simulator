@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { classifyBuilding } from './buildingStrategy';
 import type { ContextDataTile } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
+import type { Polygon } from 'geojson';
 
 function makeFeatures(): ContextDataTile['features'] {
   return {
@@ -17,22 +17,17 @@ function makeFeatures(): ContextDataTile['features'] {
   };
 }
 
-const squarePolygon: ClassifiedGeometry = {
-  polygon: {
-    type: 'Polygon',
-    coordinates: [
-      [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-        [0, 0],
-      ],
+const squarePolygon: Polygon = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
     ],
-  },
-  line: null,
-  point: null,
-  isClosed: true,
+  ],
 };
 
 describe('classifyBuilding – isPart', () => {

@@ -7,10 +7,7 @@ import {
   Group,
   type Object3D,
 } from 'three';
-import type {
-  VegetationVisual,
-  Point,
-} from '../../../../data/contextual/types';
+import type { VegetationVisual } from '../../../../data/contextual/types';
 import type { ElevationSampler } from '../../util/ElevationSampler';
 import { mercatorToThreeJs } from '../../../../gis/types';
 import type { IVegetationStrategy } from './types';
@@ -25,7 +22,7 @@ export class SingleTreeStrategy implements IVegetationStrategy {
 
   create(veg: VegetationVisual): Object3D[] {
     if (veg.geometry.type !== 'Point') return [];
-    const [x, y] = (veg.geometry as Point).coordinates;
+    const [x, y] = veg.geometry.coordinates as [number, number];
     const terrainY = this.elevation.sampleAt(x, y);
 
     const isNeedle = veg.leafType === 'needleleaved';

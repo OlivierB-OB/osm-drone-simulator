@@ -8,7 +8,9 @@ import {
   type Object3D,
   Path,
 } from 'three';
-import type { BuildingVisual, Polygon } from '../../../data/contextual/types';
+import centroid from '@turf/centroid';
+import type { Polygon } from 'geojson';
+import type { BuildingVisual } from '../../../data/contextual/types';
 import type { ElevationSampler } from '../util/ElevationSampler';
 import { mercatorToThreeJs } from '../../../gis/types';
 import { buildingHeightDefaults, roofColorDefaults } from '../../../config';
@@ -67,16 +69,15 @@ export class BuildingMeshFactory {
     polygon: Polygon
   ): Object3D | null {
     try {
-      const outerRing = polygon.coordinates[0];
-      if (!outerRing || outerRing.length < 4) return null;
+      const outerRing = polygon.coordinates[0] as [number, number][];
 
       // Compute centroid for local coordinate space
-      const centroid = this.computeCentroid(outerRing);
+      const center = centroid(polygon).geometry.coordinates as [number, number];
 
       // Build local ring (relative to centroid)
       const localRing: [number, number][] = outerRing.map((pt) => [
-        pt[0] - centroid[0],
-        pt[1] - centroid[1],
+        pt[0] - center[0],
+        pt[1] - center[1],
       ]);
 
       // Resolve heights
@@ -112,11 +113,11 @@ export class BuildingMeshFactory {
         const innerRing = polygon.coordinates[r];
         if (!innerRing || innerRing.length < 4) continue;
         const hole = new Path();
-        const hFirst = innerRing[0]!;
-        hole.moveTo(hFirst[0] - centroid[0], hFirst[1] - centroid[1]);
+        const hFirst = innerRing[0] as [number, number];
+        hole.moveTo(hFirst[0] - center[0], hFirst[1] - center[1]);
         for (let i = 1; i < innerRing.length; i++) {
-          const pt = innerRing[i]!;
-          hole.lineTo(pt[0] - centroid[0], pt[1] - centroid[1]);
+          const pt = innerRing[i] as [number, number];
+          hole.lineTo(pt[0] - center[0], pt[1] - center[1]);
         }
         shape.holes.push(hole);
       }
@@ -149,10 +150,7 @@ export class BuildingMeshFactory {
       ]);
 
       // World position
-      const terrainElevation = this.elevation.sampleAt(
-        centroid[0],
-        centroid[1]
-      );
+      const terrainElevation = this.elevation.sampleAt(center[0], center[1]);
       const worldY = terrainElevation + minHeight;
 
       // For pitched roofs, add roof geometry
@@ -182,17 +180,14 @@ export class BuildingMeshFactory {
           const group = new Group();
           group.add(wallMesh);
           group.add(roofMesh);
-          const pos = mercatorToThreeJs(
-            { x: centroid[0], y: centroid[1] },
-            worldY
-          );
+          const pos = mercatorToThreeJs({ x: center[0], y: center[1] }, worldY);
           group.position.set(pos.x, pos.y, pos.z);
           return group;
         }
       }
 
       // Flat roof or roof geometry failed — return single mesh
-      const pos = mercatorToThreeJs({ x: centroid[0], y: centroid[1] }, worldY);
+      const pos = mercatorToThreeJs({ x: center[0], y: center[1] }, worldY);
       wallMesh.position.set(pos.x, pos.y, pos.z);
       return wallMesh;
     } catch {

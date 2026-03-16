@@ -23,7 +23,7 @@ export class BridgeMeshFactory {
       if (!road.bridge) continue;
       meshes.push(
         ...this.createDeckSegments(
-          road.geometry.coordinates,
+          road.geometry.coordinates as [number, number][],
           road.widthMeters + DECK_MARGIN * 2,
           road.layer ?? 1
         )
@@ -38,7 +38,7 @@ export class BridgeMeshFactory {
       if (!railway.bridge) continue;
       meshes.push(
         ...this.createDeckSegments(
-          railway.geometry.coordinates,
+          railway.geometry.coordinates as [number, number][],
           railway.widthMeters + DECK_MARGIN * 2,
           railway.layer ?? 1
         )

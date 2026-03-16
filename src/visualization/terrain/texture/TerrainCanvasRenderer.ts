@@ -1,3 +1,5 @@
+import type { LineString, Polygon } from 'geojson';
+import area from '@turf/area';
 import type { ContextDataTile } from '../../../data/contextual/types';
 import type { MercatorBounds } from '../../../gis/types';
 import { groundColors } from '../../../config';
@@ -64,16 +66,6 @@ export class TerrainCanvasRenderer {
     ctx.fillRect(0, 0, width, height);
   }
 
-  private polygonOuterRingArea(rings: Array<Array<[number, number]>>): number {
-    const ring = rings[0];
-    if (!ring || ring.length < 3) return 0;
-    let area = 0;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      area += (ring[j]![0] + ring[i]![0]) * (ring[j]![1] - ring[i]![1]);
-    }
-    return Math.abs(area) / 2;
-  }
-
   private drawLanduse(
     ctx: CanvasRenderingContext2D,
     tile: ContextDataTile,
@@ -83,22 +75,12 @@ export class TerrainCanvasRenderer {
   ): void {
     // Sort: larger polygons first (background)
     const sorted = [...tile.features.landuse].sort((a, b) => {
-      return (
-        this.polygonOuterRingArea(b.geometry.coordinates) -
-        this.polygonOuterRingArea(a.geometry.coordinates)
-      );
+      return area(b.geometry) - area(a.geometry);
     });
+
     for (const lu of sorted) {
       ctx.fillStyle = lu.color;
-      this.drawPolygon(
-        ctx,
-        lu.geometry.coordinates,
-        bounds,
-        scaleX,
-        scaleY,
-        true,
-        false
-      );
+      this.drawPolygon(ctx, lu.geometry, bounds, scaleX, scaleY, true, false);
     }
   }
 
@@ -115,7 +97,7 @@ export class TerrainCanvasRenderer {
       if (water.geometry.type === 'Polygon') {
         this.drawPolygon(
           ctx,
-          water.geometry.coordinates,
+          water.geometry,
           bounds,
           scaleX,
           scaleY,
@@ -139,7 +121,7 @@ export class TerrainCanvasRenderer {
       if (water.geometry.type === 'Polygon') {
         this.drawPolygon(
           ctx,
-          water.geometry.coordinates,
+          water.geometry,
           bounds,
           scaleX,
           scaleY,
@@ -165,13 +147,7 @@ export class TerrainCanvasRenderer {
       ctx.strokeStyle = water.color;
       ctx.lineWidth = water.widthMeters * scaleX;
       if (water.geometry.type === 'LineString') {
-        this.drawLineString(
-          ctx,
-          water.geometry.coordinates,
-          bounds,
-          scaleX,
-          scaleY
-        );
+        this.drawLineString(ctx, water.geometry, bounds, scaleX, scaleY);
       }
     }
   }
@@ -192,7 +168,7 @@ export class TerrainCanvasRenderer {
       if (veg.geometry.type === 'Polygon') {
         this.drawPolygon(
           ctx,
-          veg.geometry.coordinates,
+          veg.geometry,
           bounds,
           scaleX,
           scaleY,
@@ -203,15 +179,9 @@ export class TerrainCanvasRenderer {
         ctx.strokeStyle = veg.color;
         ctx.lineWidth = 0.5;
         ctx.setLineDash([]);
-        this.drawLineString(
-          ctx,
-          veg.geometry.coordinates,
-          bounds,
-          scaleX,
-          scaleY
-        );
+        this.drawLineString(ctx, veg.geometry, bounds, scaleX, scaleY);
       } else if (veg.geometry.type === 'Point') {
-        const [x, y] = veg.geometry.coordinates;
+        const [x, y] = veg.geometry.coordinates as [number, number];
         const canvasX = (x - bounds.minX) * scaleX;
         const canvasY = (bounds.maxY - y) * scaleY;
         ctx.beginPath();
@@ -236,7 +206,7 @@ export class TerrainCanvasRenderer {
       if (aeroway.geometry.type === 'Polygon') {
         this.drawPolygon(
           ctx,
-          aeroway.geometry.coordinates,
+          aeroway.geometry,
           bounds,
           scaleX,
           scaleY,
@@ -245,15 +215,9 @@ export class TerrainCanvasRenderer {
         );
       } else if (aeroway.geometry.type === 'LineString') {
         ctx.lineWidth = (aeroway.widthMeters ?? 45) * scaleX; // runway: 45m, taxiway: 23m, taxilane: 12m
-        this.drawLineString(
-          ctx,
-          aeroway.geometry.coordinates,
-          bounds,
-          scaleX,
-          scaleY
-        );
+        this.drawLineString(ctx, aeroway.geometry, bounds, scaleX, scaleY);
       } else if (aeroway.geometry.type === 'Point') {
-        const [x, y] = aeroway.geometry.coordinates;
+        const [x, y] = aeroway.geometry.coordinates as [number, number];
         const canvasX = (x - bounds.minX) * scaleX;
         const canvasY = (bounds.maxY - y) * scaleY;
         ctx.beginPath();
@@ -282,13 +246,7 @@ export class TerrainCanvasRenderer {
       ctx.setLineDash(road.type === 'steps' ? [2, 2] : []); // spec §5.5: steps dash [2,2]
       ctx.strokeStyle = road.surfaceColor ?? road.color;
       ctx.lineWidth = road.widthMeters * scaleX;
-      this.drawLineString(
-        ctx,
-        road.geometry.coordinates,
-        bounds,
-        scaleX,
-        scaleY
-      );
+      this.drawLineString(ctx, road.geometry, bounds, scaleX, scaleY);
     }
     ctx.setLineDash([]);
   }
@@ -307,13 +265,7 @@ export class TerrainCanvasRenderer {
       ctx.strokeStyle = railway.color;
       ctx.lineWidth = railway.widthMeters * scaleX;
       ctx.setLineDash(railway.dash);
-      this.drawLineString(
-        ctx,
-        railway.geometry.coordinates,
-        bounds,
-        scaleX,
-        scaleY
-      );
+      this.drawLineString(ctx, railway.geometry, bounds, scaleX, scaleY);
     }
 
     ctx.setLineDash([]);
@@ -321,18 +273,17 @@ export class TerrainCanvasRenderer {
 
   private drawPolygon(
     ctx: CanvasRenderingContext2D,
-    rings: Array<Array<[number, number]>>,
+    geometry: Polygon,
     bounds: MercatorBounds,
     scaleX: number,
     scaleY: number,
     fill: boolean,
     stroke: boolean
   ): void {
-    if (rings.length === 0 || (rings[0]?.length ?? 0) === 0) return;
+    const rings = geometry.coordinates as [number, number][][];
 
     ctx.beginPath();
     for (const ring of rings) {
-      if (ring.length === 0) continue;
       let first = true;
       for (const [x, y] of ring) {
         const canvasX = (x - bounds.minX) * scaleX;
@@ -353,12 +304,12 @@ export class TerrainCanvasRenderer {
 
   private drawLineString(
     ctx: CanvasRenderingContext2D,
-    coordinates: Array<[number, number]>,
+    geometry: LineString,
     bounds: MercatorBounds,
     scaleX: number,
     scaleY: number
   ): void {
-    if (coordinates.length < 2) return;
+    const coordinates = geometry.coordinates as [number, number][];
 
     ctx.beginPath();
     let firstPoint = true;

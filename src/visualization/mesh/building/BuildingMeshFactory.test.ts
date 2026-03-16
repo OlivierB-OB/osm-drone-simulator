@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { Group, Mesh } from 'three';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import type { ElevationSampler } from '../util/ElevationSampler';
-import type { BuildingVisual, Polygon } from '../../../data/contextual/types';
+import type { Polygon } from 'geojson';
+import type { BuildingVisual } from '../../../data/contextual/types';
 
 // Simple rectangle polygon for testing
 const rectanglePolygon: Polygon = {
@@ -102,30 +103,6 @@ describe('BuildingMeshFactory', () => {
     const roofMesh = group.children[1]!;
     // wallHeight = 5 - clampedRoofHeight, with extrudeDepth >= 1
     expect(roofMesh.position.y).toBeGreaterThanOrEqual(1);
-  });
-
-  it('skips buildings with degenerate polygons', () => {
-    const degenerate: Polygon = {
-      type: 'Polygon',
-      coordinates: [
-        [
-          [0, 0],
-          [1, 0],
-          [0, 0],
-        ],
-      ],
-    };
-    const result = factory.create([makeBuilding({ geometry: degenerate })]);
-    expect(result).toHaveLength(0);
-  });
-
-  it('skips non-polygon geometries', () => {
-    const result = factory.create([
-      makeBuilding({
-        geometry: { type: 'Point', coordinates: [0, 0] } as never,
-      }),
-    ]);
-    expect(result).toHaveLength(0);
   });
 
   it('skips parent buildings when hasParts is true', () => {

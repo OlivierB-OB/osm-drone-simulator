@@ -1,6 +1,6 @@
 import type { ContextDataTile, BarrierVisual } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { barrierDefaults } from '../../../config';
+import type { LineString } from 'geojson';
 
 const BARRIER_TYPES = new Set(['wall', 'city_wall', 'retaining_wall', 'hedge']);
 
@@ -9,19 +9,18 @@ export { BARRIER_TYPES };
 export function classifyBarrier(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: LineString,
   features: ContextDataTile['features']
 ): void {
   const barrierType = tags.barrier;
   if (!barrierType || !BARRIER_TYPES.has(barrierType)) return;
-  if (!geometry.line) return;
 
   const defaults = barrierDefaults[barrierType];
   if (!defaults) return;
 
   const barrier: BarrierVisual = {
     id,
-    geometry: geometry.line,
+    geometry,
     type: barrierType,
     height: tags.height ? parseFloat(tags.height) : undefined,
     width: defaults.width,

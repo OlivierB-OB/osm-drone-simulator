@@ -1,6 +1,6 @@
 import type { ContextDataTile, WaterVisual, HexColor } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { groundColors, waterwayWidthsMeters } from '../../../config';
+import type { LineString, Polygon } from 'geojson';
 
 function getWaterColorAndWidth(
   waterType: string,
@@ -24,19 +24,17 @@ function getWaterColorAndWidth(
 export function classifyWater(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon | LineString,
   features: ContextDataTile['features']
 ): void {
   const waterType: string =
     tags.waterway || tags.water || tags['natural'] || tags.landuse || 'water';
 
-  const isArea = geometry.isClosed;
-  const geom = isArea ? geometry.polygon : geometry.line;
-  if (!geom) return;
+  const isArea = geometry.type === 'Polygon';
   const { color, widthMeters } = getWaterColorAndWidth(waterType, isArea);
   const water: WaterVisual = {
     id,
-    geometry: geom,
+    geometry,
     type: waterType,
     isArea,
     widthMeters,

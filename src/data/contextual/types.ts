@@ -1,24 +1,5 @@
 import type { TileCoordinates, MercatorBounds } from '../elevation/types';
-
-/**
- * Geometry types for OSM features
- */
-export type Geometry = Point | LineString | Polygon;
-
-export interface Point {
-  type: 'Point';
-  coordinates: [number, number]; // [x, y] in Mercator
-}
-
-export interface LineString {
-  type: 'LineString';
-  coordinates: [number, number][]; // Array of [x, y] in Mercator
-}
-
-export interface Polygon {
-  type: 'Polygon';
-  coordinates: [number, number][][]; // Array of rings, each ring is array of [x, y]
-}
+import type { Point, LineString, Polygon } from 'geojson';
 
 /**
  * Color representation in hex format

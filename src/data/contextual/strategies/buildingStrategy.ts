@@ -1,10 +1,10 @@
 import type { ContextDataTile, BuildingVisual, HexColor } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import {
   colorPalette,
   buildingMaterialColors,
   roofMaterialColors,
 } from '../../../config';
+import type { LineString, Point, Polygon } from 'geojson';
 
 function getColorForBuilding(
   tags: Record<string, string>,
@@ -36,7 +36,7 @@ function getRoofColor(tags: Record<string, string>): HexColor | undefined {
 export function classifyBuilding(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon | LineString | Point,
   features: ContextDataTile['features']
 ): void {
   const height = tags.height ? parseFloat(tags.height) : undefined;
@@ -49,11 +49,10 @@ export function classifyBuilding(
     : undefined;
 
   const buildingType = tags['building:type'] || tags.building || 'other';
-  const geom = geometry.polygon ?? geometry.line ?? geometry.point;
-  if (!geom) return;
+
   const building: BuildingVisual = {
     id,
-    geometry: geom,
+    geometry,
     type: buildingType,
     height,
     minHeight,

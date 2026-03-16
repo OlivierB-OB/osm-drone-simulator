@@ -1,7 +1,7 @@
 import type { ContextDataTile, VegetationVisual, HexColor } from '../types';
-import type { ClassifiedGeometry } from './parserUtils';
 import { getHeightCategory } from './parserUtils';
 import { groundColors } from '../../../config';
+import type { LineString, Point, Polygon } from 'geojson';
 
 function getColorForVegetation(vegType: string): HexColor {
   const typeNormalized = vegType.toLowerCase();
@@ -37,17 +37,17 @@ function extract3DAttributes(tags: Record<string, string>): {
 export function classifyVegetation(
   id: string,
   tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
+  geometry: Polygon | LineString | Point,
   features: ContextDataTile['features'],
   isForest: boolean
 ): void {
   const attrs = extract3DAttributes(tags);
 
   if (isForest) {
-    if (!geometry.polygon) return;
+    if (geometry.type !== 'Polygon') return;
     const vegetation: VegetationVisual = {
       id,
-      geometry: geometry.polygon,
+      geometry,
       type: 'forest',
       height: undefined,
       heightCategory: 'tall',
@@ -59,14 +59,10 @@ export function classifyVegetation(
   }
 
   const vegType: string = tags.natural || 'vegetation';
-  const geom = geometry.isClosed
-    ? geometry.polygon
-    : (geometry.line ?? geometry.point);
-  if (!geom) return;
   const height = tags.height ? parseFloat(tags.height) : undefined;
   const vegetation: VegetationVisual = {
     id,
-    geometry: geom,
+    geometry,
     type: vegType,
     height,
     heightCategory: getHeightCategory(height),
