@@ -8,9 +8,7 @@ import type {
 import type { MercatorBounds } from '../elevation/types';
 import { latLngToMercator } from './strategies/parserUtils';
 import type { ClassifiedGeometry } from './strategies/parserUtils';
-import centroid from '@turf/centroid';
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import { point } from '@turf/helpers';
+import booleanContains from '@turf/boolean-contains';
 import { classifyBuilding } from './strategies/buildingStrategy';
 import { classifyRoad } from './strategies/roadStrategy';
 import { classifyRailway } from './strategies/railwayStrategy';
@@ -387,25 +385,10 @@ export class ContextDataTileParser {
     );
 
     for (const part of parts) {
-      const partGeom = part.geometry as Polygon;
-      if (!partGeom.coordinates[0] || partGeom.coordinates[0].length < 4)
-        continue;
-      const partCentroid = centroid(partGeom);
-
       for (const parent of nonParts) {
-        const parentGeom = parent.geometry as Polygon;
-        let contained = booleanPointInPolygon(partCentroid, parentGeom);
-        if (!contained) {
-          // Fallback: centroid of concave parts can fall outside the polygon itself.
-          // Any vertex of the part inside the parent ring suffices.
-          for (const vertex of partGeom.coordinates[0] ?? []) {
-            if (booleanPointInPolygon(point(vertex), parentGeom)) {
-              contained = true;
-              break;
-            }
-          }
-        }
-        if (contained) {
+        if (
+          booleanContains(parent.geometry as Polygon, part.geometry as Polygon)
+        ) {
           parent.hasParts = true;
           break;
         }
