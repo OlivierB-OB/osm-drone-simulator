@@ -5,40 +5,14 @@ import type { ElevationSampler } from './util/ElevationSampler';
 import type { ContextDataManager } from '../../data/contextual/ContextDataManager';
 import type { Object3D } from 'three';
 
-// Shared arrays that factory create-methods return — mutated per-test in beforeEach
-const buildingMeshes: Object3D[] = [];
-const bridgeRoadMeshes: Object3D[] = [];
-
-// Vitest 4 requires function (not arrow) declarations for constructable mocks
-vi.mock('./building/BuildingMeshFactory', () => ({
-  BuildingMeshFactory: vi.fn(function (this: { create: () => Object3D[] }) {
-    this.create = vi.fn(() => [...buildingMeshes]);
-  }),
+// Mock the registry module
+const mockCreateAllMeshes = vi.fn((): Object3D[] => []);
+vi.mock('../../features/registry', () => ({
+  featureRegistry: {
+    createAllMeshes: () => mockCreateAllMeshes(),
+  },
 }));
-vi.mock('./vegetation/VegetationMeshFactory', () => ({
-  VegetationMeshFactory: vi.fn(function (this: { create: () => Object3D[] }) {
-    this.create = vi.fn(() => []);
-  }),
-}));
-vi.mock('./structure/StructureMeshFactory', () => ({
-  StructureMeshFactory: vi.fn(function (this: { create: () => Object3D[] }) {
-    this.create = vi.fn(() => []);
-  }),
-}));
-vi.mock('./barrier/BarrierMeshFactory', () => ({
-  BarrierMeshFactory: vi.fn(function (this: { create: () => Object3D[] }) {
-    this.create = vi.fn(() => []);
-  }),
-}));
-vi.mock('./bridge/BridgeMeshFactory', () => ({
-  BridgeMeshFactory: vi.fn(function (this: {
-    createFromRoads: () => Object3D[];
-    createFromRailways: () => Object3D[];
-  }) {
-    this.createFromRoads = vi.fn(() => [...bridgeRoadMeshes]);
-    this.createFromRailways = vi.fn(() => []);
-  }),
-}));
+vi.mock('../../features/registration', () => ({}));
 
 // Import AFTER vi.mock so the mocked version is used
 const { MeshObjectManager } = await import('./MeshObjectManager');
@@ -119,9 +93,8 @@ describe('MeshObjectManager', () => {
   let scene: Scene;
 
   beforeEach(() => {
-    buildingMeshes.length = 0;
-    bridgeRoadMeshes.length = 0;
     vi.clearAllMocks();
+    mockCreateAllMeshes.mockReturnValue([]);
     dataSource = makeDataSource();
     scene = makeScene();
   });
@@ -161,7 +134,7 @@ describe('MeshObjectManager', () => {
 
     it('adds factory-produced meshes to scene', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
@@ -178,7 +151,7 @@ describe('MeshObjectManager', () => {
 
     it('removes mesh from scene and disposes geometry and material', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
@@ -191,7 +164,7 @@ describe('MeshObjectManager', () => {
 
     it('does not re-remove mesh after second tileRemoved for same key', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
@@ -206,14 +179,13 @@ describe('MeshObjectManager', () => {
     it('no-ops when elevation key has no matching context tile', () => {
       const elevationSource = makeElevationDataSource();
       buildManager(elevationSource);
-      // No context tile loaded — elevation event must not throw or add meshes
       expect(() => elevationSource.fireAdded('9:261:168')).not.toThrow();
       expect(scene.add).not.toHaveBeenCalled();
     });
 
     it('rebuilds meshes when elevation key matches a loaded context tile', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       const elevationSource = makeElevationDataSource();
       buildManager(elevationSource);
@@ -223,7 +195,8 @@ describe('MeshObjectManager', () => {
 
       // Reset for rebuild detection
       vi.clearAllMocks();
-      buildingMeshes.push(makeMockMesh());
+      const newMesh = makeMockMesh();
+      mockCreateAllMeshes.mockReturnValue([newMesh]);
 
       elevationSource.fireAdded('9:261:168');
 
@@ -234,7 +207,7 @@ describe('MeshObjectManager', () => {
 
     it('disposes old mesh geometry and material on rebuild', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       const elevationSource = makeElevationDataSource();
       buildManager(elevationSource);
@@ -263,7 +236,7 @@ describe('MeshObjectManager', () => {
 
     it('removes all remaining stored meshes from scene', () => {
       const mesh = makeMockMesh();
-      buildingMeshes.push(mesh);
+      mockCreateAllMeshes.mockReturnValue([mesh]);
 
       const manager = buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));

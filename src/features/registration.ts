@@ -1,0 +1,22 @@
+import { featureRegistry } from './registry';
+import { buildingModule } from './building';
+import { roadModule } from './road';
+import { railwayModule } from './railway';
+import { waterModule } from './water';
+import { aerowayModule } from './aeroway';
+import { structureModule } from './structure';
+import { barrierModule } from './barrier';
+import { vegetationModule } from './vegetation';
+import { landuseModule } from './landuse';
+import { bridgeModule } from './bridge';
+
+featureRegistry.register(buildingModule);
+featureRegistry.register(roadModule);
+featureRegistry.register(railwayModule);
+featureRegistry.register(waterModule);
+featureRegistry.register(aerowayModule);
+featureRegistry.register(structureModule);
+featureRegistry.register(barrierModule);
+featureRegistry.register(vegetationModule);
+featureRegistry.register(landuseModule);
+featureRegistry.register(bridgeModule);

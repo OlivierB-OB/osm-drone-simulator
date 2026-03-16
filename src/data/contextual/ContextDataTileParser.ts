@@ -1,24 +1,9 @@
 import type { Point, LineString, Polygon } from 'geojson';
-import type { ContextDataTile, BuildingVisual } from './types';
+import type { ContextDataTile } from './types';
 import type { MercatorBounds } from '../elevation/types';
 import { latLngToMercator } from './strategies/parserUtils';
-import booleanContains from '@turf/boolean-contains';
-import { classifyBuilding } from './strategies/buildingStrategy';
-import { classifyRoad } from './strategies/roadStrategy';
-import { classifyRailway } from './strategies/railwayStrategy';
-import { classifyWater } from './strategies/waterStrategy';
-import { classifyAeroway, AEROWAY_TYPES } from './strategies/aerowayStrategy';
-import { classifyVegetation } from './strategies/vegetationStrategy';
-import {
-  classifyLanduse,
-  LANDUSE_TYPES,
-  NATURAL_LANDUSE_TYPES,
-} from './strategies/landuseStrategy';
-import {
-  classifyStructure,
-  STRUCTURE_TYPES,
-} from './strategies/structureStrategy';
-import { classifyBarrier, BARRIER_TYPES } from './strategies/barrierStrategy';
+import { featureRegistry } from '../../features/registry';
+import '../../features/registration';
 import { lineString, point, polygon } from '@turf/helpers';
 
 /**
@@ -96,13 +81,13 @@ export class ContextDataTileParser {
       }
     }
 
-    this.markBuildingParents(features.buildings);
+    featureRegistry.runPostProcessing(features);
 
     return features;
   }
 
   /**
-   * Dispatches a classified element to the appropriate strategy.
+   * Dispatches a classified element to the appropriate feature module via the registry.
    */
   private static classifyElement(
     id: string,
@@ -110,56 +95,7 @@ export class ContextDataTileParser {
     geometry: Point | LineString | Polygon,
     features: ContextDataTile['features']
   ): void {
-    if (tags.building || tags['building:part']) {
-      classifyBuilding(id, tags, geometry, features);
-    } else if (tags.highway) {
-      // Roads require line geometry; skip point nodes (highway=crossing, etc.)
-      if (geometry.type === 'LineString')
-        classifyRoad(id, tags, geometry, features);
-    } else if (tags.railway) {
-      // Railways require line geometry; skip point nodes
-      if (geometry.type === 'LineString')
-        classifyRailway(id, tags, geometry, features);
-    } else if (
-      tags.waterway ||
-      tags['natural'] === 'water' ||
-      tags['natural'] === 'wetland' ||
-      tags['natural'] === 'coastline' ||
-      tags.water ||
-      tags.landuse === 'water'
-    ) {
-      // Water requires line or polygon; skip point nodes (waterway=weir, etc.)
-      if (geometry.type === 'LineString' || geometry.type === 'Polygon')
-        classifyWater(id, tags, geometry, features);
-    } else if (tags.aeroway && AEROWAY_TYPES.has(tags.aeroway)) {
-      classifyAeroway(id, tags, geometry, features);
-    } else if (
-      (tags.man_made && STRUCTURE_TYPES.has(tags.man_made)) ||
-      tags.power === 'tower' ||
-      tags.power === 'pole' ||
-      tags.aerialway === 'pylon'
-    ) {
-      if (geometry.type === 'Polygon' || geometry.type === 'Point')
-        classifyStructure(id, tags, geometry, features);
-    } else if (tags.barrier && BARRIER_TYPES.has(tags.barrier)) {
-      // Barriers require line geometry; skip point nodes
-      if (geometry.type === 'LineString')
-        classifyBarrier(id, tags, geometry, features);
-    } else if (tags.landuse === 'forest') {
-      classifyVegetation(id, tags, geometry, features, true);
-    } else if (
-      (tags.landuse && LANDUSE_TYPES.has(tags.landuse)) ||
-      tags.leisure === 'park' ||
-      tags.leisure === 'garden'
-    ) {
-      if (geometry.type === 'Polygon')
-        classifyLanduse(id, tags, geometry, features, false);
-    } else if (tags.natural && NATURAL_LANDUSE_TYPES.has(tags.natural)) {
-      if (geometry.type === 'Polygon')
-        classifyLanduse(id, tags, geometry, features, true);
-    } else if (tags.natural) {
-      classifyVegetation(id, tags, geometry, features, false);
-    }
+    featureRegistry.classify(id, tags, geometry, features);
   }
 
   /**
@@ -345,29 +281,6 @@ export class ContextDataTileParser {
     }
 
     return ring.length >= 4 ? ring : null;
-  }
-
-  /**
-   * Detects building:part containment spatially: for each part polygon, finds the
-   * non-part building whose footprint contains it and sets hasParts=true on that parent.
-   * In OSM there is no explicit parent–part link; containment is inferred from geometry.
-   */
-  private static markBuildingParents(buildings: BuildingVisual[]): void {
-    const nonParts = buildings.filter(
-      (b) => !b.isPart && b.geometry.type === 'Polygon'
-    );
-    const parts = buildings.filter(
-      (b) => b.isPart && b.geometry.type === 'Polygon'
-    );
-
-    for (const part of parts) {
-      for (const parent of nonParts) {
-        if (booleanContains(parent.geometry, part.geometry)) {
-          parent.hasParts = true;
-          break;
-        }
-      }
-    }
   }
 
   /**
