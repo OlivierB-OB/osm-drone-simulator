@@ -1,4 +1,4 @@
-import type { StructureVisual } from '../../data/contextual/types';
+import type { StructureVisual } from './types';
 import { structureDefaults } from '../../config';
 import type { Point, Polygon } from 'geojson';
 

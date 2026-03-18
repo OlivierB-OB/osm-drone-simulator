@@ -1,6 +1,6 @@
-import type { BarrierVisual } from '../../data/contextual/types';
 import { barrierDefaults } from '../../config';
 import type { LineString } from 'geojson';
+import type { BarrierVisual } from './types';
 
 const BARRIER_TYPES = new Set(['wall', 'city_wall', 'retaining_wall', 'hedge']);
 

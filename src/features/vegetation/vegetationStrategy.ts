@@ -1,4 +1,5 @@
-import type { VegetationVisual, HexColor } from '../../data/contextual/types';
+import type { VegetationVisual } from './types';
+import type { HexColor } from '../sharedTypes';
 import { getHeightCategory } from '../../data/contextual/strategies/parserUtils';
 import { groundColors } from '../../config';
 import type { LineString, Point, Polygon } from 'geojson';

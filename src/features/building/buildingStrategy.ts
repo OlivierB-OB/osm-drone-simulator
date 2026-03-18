@@ -1,4 +1,5 @@
-import type { BuildingVisual, HexColor } from '../../data/contextual/types';
+import type { BuildingVisual } from './types';
+import type { HexColor } from '../sharedTypes';
 import {
   colorPalette,
   buildingMaterialColors,

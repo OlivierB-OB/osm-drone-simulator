@@ -1,4 +1,4 @@
-import type { VegetationVisual } from '../../data/contextual/types';
+import type { VegetationVisual } from './types';
 import type { CanvasDrawContext } from '../types';
 import { drawPolygon } from '../canvasHelpers';
 

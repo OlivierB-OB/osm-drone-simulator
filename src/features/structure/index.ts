@@ -1,16 +1,17 @@
 import type { FeatureModule } from '../types';
-import type { StructureVisual } from '../../data/contextual/types';
 import type { Object3D } from 'three';
-import type { Point, Polygon } from 'geojson';
-import type { ContextDataTile } from '../sharedTypes';
+import type { LineString, Point, Polygon } from 'geojson';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { STRUCTURE_TYPES, classifyStructure } from './structureStrategy';
 import { StructureMeshFactory } from './StructureMeshFactory';
+import type { ModuleFeatures } from './types';
 
-export const structureModule: FeatureModule<StructureVisual> = {
-  name: 'structure',
-  featureKey: 'structures',
+export const structureModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 55,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { structures: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [
@@ -32,16 +33,21 @@ export const structureModule: FeatureModule<StructureVisual> = {
     );
   },
 
-  classify(id, tags, geometry): StructureVisual | null {
-    return classifyStructure(id, tags, geometry as Polygon | Point);
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
+    const feature = classifyStructure(id, tags, geometry as Polygon | Point);
+    if (feature) features.structures.push(feature);
   },
 
   createMeshes(
-    features: StructureVisual[],
-    _allFeatures: ContextDataTile['features'],
+    features: ModuleFeatures,
     elevationSampler: ElevationSampler
   ): Object3D[] {
     const factory = new StructureMeshFactory(elevationSampler);
-    return factory.create(features);
+    return factory.create(features.structures);
   },
 };

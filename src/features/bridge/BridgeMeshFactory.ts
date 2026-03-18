@@ -1,5 +1,6 @@
 import { BoxGeometry, MeshLambertMaterial, Mesh, type Object3D } from 'three';
-import type { RoadVisual, RailwayVisual } from '../../data/contextual/types';
+import type { RoadVisual } from '../road/types';
+import type { RailwayVisual } from '../railway/types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { mercatorToThreeJs } from '../../gis/types';
 

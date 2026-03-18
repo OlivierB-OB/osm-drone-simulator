@@ -10,7 +10,7 @@ import {
 } from 'three';
 import centroid from '@turf/centroid';
 import type { Polygon } from 'geojson';
-import type { BuildingVisual } from '../../data/contextual/types';
+import type { BuildingVisual } from './types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { mercatorToThreeJs } from '../../gis/types';
 import { buildingHeightDefaults, roofColorDefaults } from '../../config';

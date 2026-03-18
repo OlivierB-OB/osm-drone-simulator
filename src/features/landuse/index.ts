@@ -1,18 +1,20 @@
-import type { FeatureModule } from '../types';
-import type { LanduseVisual } from '../../data/contextual/types';
-import type { Polygon } from 'geojson';
+import type { CanvasDrawContext, FeatureModule } from '../types';
+import type { LineString, Point, Polygon } from 'geojson';
 import {
   classifyLanduse,
   LANDUSE_TYPES,
   NATURAL_LANDUSE_TYPES,
 } from './landuseStrategy';
 import { drawLanduse } from './canvas';
+import type { ModuleFeatures } from './types';
 
-export const landuseModule: FeatureModule<LanduseVisual> = {
-  name: 'landuse',
-  featureKey: 'landuse',
+export const landuseModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 65,
   canvasOrder: 10,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { landuse: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [
@@ -43,14 +45,20 @@ export const landuseModule: FeatureModule<LanduseVisual> = {
     return false;
   },
 
-  classify(id, tags, geometry): LanduseVisual {
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
     const isNatural = !!(
       tags.natural && NATURAL_LANDUSE_TYPES.has(tags.natural)
     );
-    return classifyLanduse(id, tags, geometry as Polygon, isNatural);
+    const feature = classifyLanduse(id, tags, geometry as Polygon, isNatural);
+    if (feature) features.landuse.push(feature);
   },
 
-  drawCanvas(features, draw): void {
-    drawLanduse(features, draw);
+  drawCanvas(features: ModuleFeatures, draw: CanvasDrawContext): void {
+    drawLanduse(features.landuse, draw);
   },
 };

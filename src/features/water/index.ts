@@ -1,14 +1,16 @@
-import type { FeatureModule } from '../types';
-import type { WaterVisual } from '../../data/contextual/types';
-import type { LineString, Polygon } from 'geojson';
+import type { CanvasDrawContext, FeatureModule } from '../types';
+import type { LineString, Point, Polygon } from 'geojson';
 import { classifyWater } from './waterStrategy';
 import { drawWater } from './canvas';
+import type { ModuleFeatures } from './types';
 
-export const waterModule: FeatureModule<WaterVisual> = {
-  name: 'water',
-  featureKey: 'waters',
+export const waterModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 40,
   canvasOrder: 20,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { waters: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [
@@ -37,11 +39,17 @@ export const waterModule: FeatureModule<WaterVisual> = {
     );
   },
 
-  classify(id, tags, geometry): WaterVisual {
-    return classifyWater(id, tags, geometry as Polygon | LineString);
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
+    const feature = classifyWater(id, tags, geometry as Polygon | LineString);
+    if (feature) features.waters.push(feature);
   },
 
-  drawCanvas(features, draw): void {
-    drawWater(features, draw);
+  drawCanvas(features: ModuleFeatures, draw: CanvasDrawContext): void {
+    drawWater(features.waters, draw);
   },
 };

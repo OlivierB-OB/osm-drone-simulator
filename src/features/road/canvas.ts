@@ -1,4 +1,4 @@
-import type { RoadVisual } from '../../data/contextual/types';
+import type { RoadVisual } from './types';
 import type { CanvasDrawContext } from '../types';
 import { drawLineString } from '../canvasHelpers';
 

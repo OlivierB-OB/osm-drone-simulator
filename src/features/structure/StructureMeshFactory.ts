@@ -1,6 +1,6 @@
 import type { Object3D } from 'three';
 import centroid from '@turf/centroid';
-import type { StructureVisual } from '../../data/contextual/types';
+import type { StructureVisual } from './types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { structureDefaults } from '../../config';
 import type { IStructureStrategy } from './meshStrategies/types';

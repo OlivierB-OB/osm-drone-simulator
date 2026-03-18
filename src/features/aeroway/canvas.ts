@@ -1,6 +1,6 @@
-import type { AerowayVisual } from '../../data/contextual/types';
 import type { CanvasDrawContext } from '../types';
 import { drawPolygon, drawLineString } from '../canvasHelpers';
+import type { AerowayVisual } from './types';
 
 export function drawAeroways(
   features: AerowayVisual[],

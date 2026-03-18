@@ -1,14 +1,16 @@
-import type { FeatureModule } from '../types';
-import type { RailwayVisual } from '../../data/contextual/types';
-import type { LineString } from 'geojson';
+import type { CanvasDrawContext, FeatureModule } from '../types';
+import type { LineString, Point, Polygon } from 'geojson';
 import { classifyRailway } from './railwayStrategy';
 import { drawRailways } from './canvas';
+import type { ModuleFeatures } from './types';
 
-export const railwayModule: FeatureModule<RailwayVisual> = {
-  name: 'railway',
-  featureKey: 'railways',
+export const railwayModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 30,
   canvasOrder: 80,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { railways: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [`way["railway"](${bbox});`];
@@ -18,11 +20,17 @@ export const railwayModule: FeatureModule<RailwayVisual> = {
     return !!tags.railway && geometryType === 'LineString';
   },
 
-  classify(id, tags, geometry): RailwayVisual {
-    return classifyRailway(id, tags, geometry as LineString);
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
+    const feature = classifyRailway(id, tags, geometry as LineString);
+    if (feature) features.railways.push(feature);
   },
 
-  drawCanvas(features, draw): void {
-    drawRailways(features, draw);
+  drawCanvas(features: ModuleFeatures, draw: CanvasDrawContext): void {
+    drawRailways(features.railways, draw);
   },
 };

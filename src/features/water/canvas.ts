@@ -1,4 +1,4 @@
-import type { WaterVisual } from '../../data/contextual/types';
+import type { WaterVisual } from './types';
 import type { CanvasDrawContext } from '../types';
 import { drawPolygon, drawLineString } from '../canvasHelpers';
 

@@ -1,8 +1,8 @@
 import type { Object3D } from 'three';
 import type { Point, LineString, Polygon } from 'geojson';
 import type { MercatorBounds } from '../gis/types';
-import type { ContextDataTile } from './sharedTypes';
 import type { ElevationSampler } from '../visualization/mesh/util/ElevationSampler';
+import type { ModulesFeatures } from './registrationTypes';
 
 export interface CanvasDrawContext {
   ctx: CanvasRenderingContext2D;
@@ -11,11 +11,11 @@ export interface CanvasDrawContext {
   scaleY: number;
 }
 
-export interface FeatureModule<T = unknown> {
-  readonly name: string;
-  readonly featureKey: string;
+export interface FeatureModule<T> {
   readonly classifyPriority: number;
   readonly canvasOrder?: number;
+
+  moduleFeaturesFactory(): T;
 
   overpassFragments?(bbox: string): string[];
 
@@ -23,15 +23,15 @@ export interface FeatureModule<T = unknown> {
   classify?(
     id: string,
     tags: Record<string, string>,
-    geometry: Point | LineString | Polygon
-  ): T | null;
-  postProcess?(features: ContextDataTile['features']): void;
+    geometry: Point | LineString | Polygon,
+    features: ModulesFeatures
+  ): void;
+  postProcess?(features: ModulesFeatures): void;
 
-  drawCanvas?(features: T[], draw: CanvasDrawContext): void;
+  drawCanvas?(features: ModulesFeatures, draw: CanvasDrawContext): void;
 
   createMeshes?(
-    features: T[],
-    allFeatures: ContextDataTile['features'],
+    features: ModulesFeatures,
     elevationSampler: ElevationSampler
   ): Object3D[];
 }

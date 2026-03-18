@@ -1,7 +1,7 @@
 import area from '@turf/area';
-import type { LanduseVisual } from '../../data/contextual/types';
 import type { CanvasDrawContext } from '../types';
 import { drawPolygon } from '../canvasHelpers';
+import type { LanduseVisual } from './types';
 
 export function drawLanduse(
   features: LanduseVisual[],

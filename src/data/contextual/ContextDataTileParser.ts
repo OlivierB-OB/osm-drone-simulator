@@ -1,10 +1,10 @@
 import type { Point, LineString, Polygon } from 'geojson';
-import type { ContextDataTile } from './types';
 import type { MercatorBounds } from '../elevation/types';
 import { latLngToMercator } from './strategies/parserUtils';
 import { featureRegistry } from '../../features/registry';
 import '../../features/registration';
 import { lineString, point, polygon } from '@turf/helpers';
+import type { ModulesFeatures } from '../../features/registrationTypes';
 
 /**
  * Parser for OSM (OpenStreetMap) data tiles.
@@ -21,18 +21,8 @@ export class ContextDataTileParser {
     // Retained for future use (bounds-based filtering, zoom-dependent detail)
     _bounds: MercatorBounds,
     _zoomLevel: number
-  ): ContextDataTile['features'] {
-    const features: ContextDataTile['features'] = {
-      buildings: [],
-      roads: [],
-      railways: [],
-      waters: [],
-      airports: [],
-      vegetation: [],
-      landuse: [],
-      structures: [],
-      barriers: [],
-    };
+  ): ModulesFeatures {
+    const features = featureRegistry.modulesFeaturesFactory();
 
     if (!Array.isArray(osmData.elements)) {
       return features;
@@ -93,7 +83,7 @@ export class ContextDataTileParser {
     id: string,
     tags: Record<string, string>,
     geometry: Point | LineString | Polygon,
-    features: ContextDataTile['features']
+    features: ModulesFeatures
   ): void {
     featureRegistry.classify(id, tags, geometry, features);
   }
@@ -104,7 +94,7 @@ export class ContextDataTileParser {
   private static processWay(
     element: Record<string, unknown>,
     nodeMap: Map<number, { lat: number; lng: number }>,
-    features: ContextDataTile['features']
+    features: ModulesFeatures
   ): void {
     const id = String(element.id);
     const tags = (element.tags as Record<string, string>) || {};
@@ -150,7 +140,7 @@ export class ContextDataTileParser {
    */
   private static processNode(
     element: Record<string, unknown>,
-    features: ContextDataTile['features']
+    features: ModulesFeatures
   ): void {
     const id = String(element.id);
     const tags = (element.tags as Record<string, string>) || {};
@@ -173,7 +163,7 @@ export class ContextDataTileParser {
   private static processRelation(
     element: Record<string, unknown>,
     wayMap: Map<number, [number, number][]>,
-    features: ContextDataTile['features']
+    features: ModulesFeatures
   ): void {
     const id = String(element.id);
     const tags = (element.tags as Record<string, string>) || {};

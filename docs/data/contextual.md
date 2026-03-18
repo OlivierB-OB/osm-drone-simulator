@@ -40,6 +40,7 @@ the system, see the Data Pipeline Pattern documentation.
 
 **Service:** Overpass API - Open-source geospatial query service
 **Available Endpoints:**
+
 - `https://overpass-api.de/api/interpreter` (primary)
 - `https://maps.mail.ru/osm/tools/overpass/api/interpreter` (Mirror, currently used)
 
@@ -66,23 +67,23 @@ For detailed ring patterns, lifecycle, lifecycle phases, and spatial organizatio
 
 ```typescript
 contextDataConfig = {
-  zoomLevel: 15,                    // Detail level: zoom 15
-  ringRadius: 1,                    // Number of tiles in each direction (3×3 grid)
-  maxConcurrentLoads: 3,            // Max simultaneous Overpass requests
-  queryTimeout: 30000,              // Query timeout in milliseconds
-  overpassEndpoint: '...',          // Overpass API endpoint
-}
+  zoomLevel: 15, // Detail level: zoom 15
+  ringRadius: 1, // Number of tiles in each direction (3×3 grid)
+  maxConcurrentLoads: 3, // Max simultaneous Overpass requests
+  queryTimeout: 30000, // Query timeout in milliseconds
+  overpassEndpoint: '...', // Overpass API endpoint
+};
 ```
 
 ### Performance Strategy
 
-| Setting | Purpose |
-|---------|---------|
-| **zoomLevel: 15** | Balances detail vs. performance; ~1.22 km × 1.22 km per tile (Web Mercator); often rounded to ~2 km |
-| **ringRadius: 1** | 3×3 grid = 9 tiles total; expands to 5×5 (25 tiles) if set to 2 |
-| **maxConcurrentLoads: 3** | Respects Overpass API rate limits; prevents network saturation |
-| **queryTimeout: 30000** | 30-second timeout per query (Overpass can be slow for large tiles) |
-| **Ring updates** | Only when drone crosses tile boundary, not continuously |
+| Setting                   | Purpose                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| **zoomLevel: 15**         | Balances detail vs. performance; ~1.22 km × 1.22 km per tile (Web Mercator); often rounded to ~2 km |
+| **ringRadius: 1**         | 3×3 grid = 9 tiles total; expands to 5×5 (25 tiles) if set to 2                                     |
+| **maxConcurrentLoads: 3** | Respects Overpass API rate limits; prevents network saturation                                      |
+| **queryTimeout: 30000**   | 30-second timeout per query (Overpass can be slow for large tiles)                                  |
+| **Ring updates**          | Only when drone crosses tile boundary, not continuously                                             |
 
 ### Query Generation
 
@@ -128,6 +129,7 @@ The system implements **three-tier caching**:
    - Special handling for rate-limit responses (429)
 
 **Cache Hierarchy Example:**
+
 ```
 Load tile 15:16384:10741
   ↓ (miss)
@@ -145,19 +147,20 @@ Return parsed ContextDataTile
 
 Nine categories of contextual features are fetched, parsed, and rendered:
 
-| Feature Type | Canvas (2D) | Mesh (3D) | Key OSM Tags |
-|---|---|---|---|
-| **Buildings** | Filled polygon | Extruded polygon + roof | `building`, `height`, `building:levels`, `roof:shape` |
-| **Roads** | Colored lines (width by type) | — | `highway`, `lanes`, `surface` |
-| **Railways** | Dashed gray lines | — | `railway`, `tracks` |
-| **Water** | Blue areas / blue lines | — | `waterway`, `natural=water` |
-| **Vegetation** | Green areas | Trees, shrubs, crowns | `natural=forest/wood`, `leaf_type`, `leaf_cycle` |
-| **Landuse** | Filled background areas | — | `landuse`, `leisure=park` |
-| **Aeroways** | Colored areas | — | `aeroway` |
-| **Structures** | — | Cylinders, boxes, tapers | `man_made`, `power`, `aerialway=pylon` |
-| **Barriers** | — | Extruded walls/hedges | `barrier`, `height`, `material` |
+| Feature Type   | Canvas (2D)                   | Mesh (3D)                | Key OSM Tags                                          |
+| -------------- | ----------------------------- | ------------------------ | ----------------------------------------------------- |
+| **Buildings**  | Filled polygon                | Extruded polygon + roof  | `building`, `height`, `building:levels`, `roof:shape` |
+| **Roads**      | Colored lines (width by type) | —                        | `highway`, `lanes`, `surface`                         |
+| **Railways**   | Dashed gray lines             | —                        | `railway`, `tracks`                                   |
+| **Water**      | Blue areas / blue lines       | —                        | `waterway`, `natural=water`                           |
+| **Vegetation** | Green areas                   | Trees, shrubs, crowns    | `natural=forest/wood`, `leaf_type`, `leaf_cycle`      |
+| **Landuse**    | Filled background areas       | —                        | `landuse`, `leisure=park`                             |
+| **Aeroways**   | Colored areas                 | —                        | `aeroway`                                             |
+| **Structures** | —                             | Cylinders, boxes, tapers | `man_made`, `power`, `aerialway=pylon`                |
+| **Barriers**   | —                             | Extruded walls/hedges    | `barrier`, `height`, `material`                       |
 
 For colors, widths, heights, and detailed rendering specs, see:
+
 - **[Canvas Rendering](../visualization/canvas-rendering.md)** — layer ordering, colors, widths, dash patterns, drawing algorithms
 - **[3D Object Visualization](../visualization/objects.md)** — heights, shapes, geometry, materials, roof types
 
@@ -177,20 +180,20 @@ OverpassJSON is a GeoJSON-compatible format returned by Overpass API containing 
     {
       "type": "node",
       "id": 12345,
-      "lat": 48.8530,
+      "lat": 48.853,
       "lon": 2.3499,
       "tags": { "building": "residential", "height": "10" }
     },
     {
       "type": "way",
       "id": 67890,
-      "nodes": [12345, 12346, 12347, 12345],  // Closed ring for polygon
+      "nodes": [12345, 12346, 12347, 12345], // Closed ring for polygon
       "tags": { "building": "residential" },
       "geometry": [
-        { "lat": 48.8530, "lon": 2.3499 },
-        { "lat": 48.8531, "lon": 2.3500 },
+        { "lat": 48.853, "lon": 2.3499 },
+        { "lat": 48.8531, "lon": 2.35 },
         { "lat": 48.8532, "lon": 2.3499 },
-        { "lat": 48.8530, "lon": 2.3499 }
+        { "lat": 48.853, "lon": 2.3499 }
       ]
     },
     {
@@ -209,14 +212,17 @@ OverpassJSON is a GeoJSON-compatible format returned by Overpass API containing 
 ### Geometry Types
 
 **Point** - Single lat/lng location
+
 - Used for: point features (tree, tower, utility pole)
 - Example: `{ "type": "Point", "coordinates": [x, y] }`
 
 **LineString** - Ordered sequence of coordinates
+
 - Used for: roads, railways, waterways, barriers
 - Example: `{ "type": "LineString", "coordinates": [[x1, y1], [x2, y2], [x3, y3]] }`
 
 **Polygon** - One or more rings (outer ring + optional holes)
+
 - Used for: buildings, water bodies, landuse areas, vegetation patches
 - First ring = outer boundary; subsequent rings = holes
 - Example: `{ "type": "Polygon", "coordinates": [[[x1, y1], [x2, y2], [x3, y3], [x1, y1]]] }`
@@ -224,6 +230,7 @@ OverpassJSON is a GeoJSON-compatible format returned by Overpass API containing 
 ### Coordinate System
 
 All coordinates are in **Mercator meters**, matching the elevation system:
+
 - **X** increases eastward
 - **Y** increases northward
 - Conversion from lat/lng: handled by `ContextDataTileLoader.mercatorToLatLng()`
@@ -249,6 +256,7 @@ VisualFeature (BuildingVisual, RoadVisual, etc.)
 ```
 
 **Strategies** in `src/data/contextual/strategies/`:
+
 - `buildingStrategy.ts` - Classify buildings; extract height, roof, material
 - `roadStrategy.ts` - Classify roads; calculate width, apply surface color
 - `railwayStrategy.ts` - Classify railways; extract track count, dash pattern
@@ -261,6 +269,7 @@ VisualFeature (BuildingVisual, RoadVisual, etc.)
 
 **Tag Matching Priority:**
 Most strategies follow this order:
+
 1. Check for explicit tags (e.g., `height`, `building:levels`)
 2. Check for material/type overrides (e.g., `building:material`)
 3. Use type defaults (e.g., residential building → 6m)
@@ -298,7 +307,7 @@ export function classifyBuilding(
   id: string,
   tags: Record<string, string>,
   geometry: ClassifiedGeometry,
-  features: ContextDataTile['features']
+  features: ModuleFeatures
 ): void {
   // Extract visual properties from tags
   const height = tags.height ? parseFloat(tags.height) : undefined;
@@ -325,16 +334,19 @@ export function classifyBuilding(
 The system handles missing data and cache failures:
 
 **When cache unavailable:**
+
 - Skip tile rendering (no error)
 - Terrain remains visible with default color
 - User continues exploration unaffected
 
 **When API fails:**
+
 - Exponential backoff retry (100ms, 200ms, 400ms)
 - Rate-limit responses (429) skip retry
 - Return null, terrain renders with no overlay
 
 **When geometry missing:**
+
 - Use fallback defaults (height, color, width)
 - Skip 3D mesh generation if insufficient data
 - Canvas texture still renders what it can
@@ -342,6 +354,7 @@ The system handles missing data and cache failures:
 ## Integration & Performance
 
 Context data loads when the drone moves, after elevation updates. For tile ring management, caching, and network concurrency, see:
+
 - **[Tile Ring System](../tile-ring-system.md)** — ring lifecycle, caching, eviction, network concurrency
 - **[Coordinate System](../coordinate-system.md)** — Mercator → Three.js transforms
 
@@ -349,46 +362,46 @@ Context data loads when the drone moves, after elevation updates. For tile ring 
 
 ### Core System
 
-| File | Purpose |
-|------|---------|
-| `src/data/contextual/ContextDataManager.ts` | Orchestrates tile loading, caching, ring management; emits tile events |
-| `src/data/contextual/ContextDataTileLoader.ts` | Fetches tiles from Overpass API; handles retry/timeout logic |
-| `src/data/contextual/ContextDataTileParser.ts` | Parses OverpassJSON; delegates to strategy functions |
-| `src/data/contextual/ContextTilePersistenceCache.ts` | IndexedDB-based tile caching (24-hour TTL) |
-| `src/data/contextual/types.ts` | TypeScript interfaces for all feature types and data structures |
+| File                                                 | Purpose                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| `src/data/contextual/ContextDataManager.ts`          | Orchestrates tile loading, caching, ring management; emits tile events |
+| `src/data/contextual/ContextDataTileLoader.ts`       | Fetches tiles from Overpass API; handles retry/timeout logic           |
+| `src/data/contextual/ContextDataTileParser.ts`       | Parses OverpassJSON; delegates to strategy functions                   |
+| `src/data/contextual/ContextTilePersistenceCache.ts` | IndexedDB-based tile caching (24-hour TTL)                             |
+| `src/data/contextual/types.ts`                       | TypeScript interfaces for all feature types and data structures        |
 
 ### Feature Classification Strategies
 
-| File | Feature Type |
-|------|--------------|
-| `src/data/contextual/strategies/buildingStrategy.ts` | Buildings (residential, commercial, offices, etc.) |
-| `src/data/contextual/strategies/roadStrategy.ts` | Roads and paths (highways, residential streets, footways) |
-| `src/data/contextual/strategies/railwayStrategy.ts` | Railways and trams |
-| `src/data/contextual/strategies/waterStrategy.ts` | Water bodies and waterways (rivers, lakes, canals) |
-| `src/data/contextual/strategies/vegetationStrategy.ts` | Forests, scrub, trees, vegetation patches |
-| `src/data/contextual/strategies/landuseStrategy.ts` | Landuse areas (parks, farmland, residential, industrial) |
-| `src/data/contextual/strategies/aerowayStrategy.ts` | Aeroways (runways, taxiways, helipads) |
-| `src/data/contextual/strategies/structureStrategy.ts` | Man-made structures (towers, chimneys, poles) |
-| `src/data/contextual/strategies/barrierStrategy.ts` | Barriers (walls, hedges, retaining walls) |
-| `src/data/contextual/strategies/parserUtils.ts` | Shared utilities: coordinate conversion, geometry parsing |
+| File                                                   | Feature Type                                              |
+| ------------------------------------------------------ | --------------------------------------------------------- |
+| `src/data/contextual/strategies/buildingStrategy.ts`   | Buildings (residential, commercial, offices, etc.)        |
+| `src/data/contextual/strategies/roadStrategy.ts`       | Roads and paths (highways, residential streets, footways) |
+| `src/data/contextual/strategies/railwayStrategy.ts`    | Railways and trams                                        |
+| `src/data/contextual/strategies/waterStrategy.ts`      | Water bodies and waterways (rivers, lakes, canals)        |
+| `src/data/contextual/strategies/vegetationStrategy.ts` | Forests, scrub, trees, vegetation patches                 |
+| `src/data/contextual/strategies/landuseStrategy.ts`    | Landuse areas (parks, farmland, residential, industrial)  |
+| `src/data/contextual/strategies/aerowayStrategy.ts`    | Aeroways (runways, taxiways, helipads)                    |
+| `src/data/contextual/strategies/structureStrategy.ts`  | Man-made structures (towers, chimneys, poles)             |
+| `src/data/contextual/strategies/barrierStrategy.ts`    | Barriers (walls, hedges, retaining walls)                 |
+| `src/data/contextual/strategies/parserUtils.ts`        | Shared utilities: coordinate conversion, geometry parsing |
 
 ### Visualization Integration
 
-| File | Purpose |
-|------|---------|
-| `src/visualization/terrain/texture/TerrainTextureObjectManager.ts` | Manages canvas texture generation and application to terrain |
-| `src/visualization/terrain/texture/TerrainTextureFactory.ts` | Canvas rendering: roads, water, vegetation, landuse, aeroways |
-| `src/visualization/mesh/MeshObjectManager.ts` | Manages 3D mesh objects for buildings, vegetation, structures, barriers |
+| File                                                               | Purpose                                                                 |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `src/visualization/terrain/texture/TerrainTextureObjectManager.ts` | Manages canvas texture generation and application to terrain            |
+| `src/visualization/terrain/texture/TerrainTextureFactory.ts`       | Canvas rendering: roads, water, vegetation, landuse, aeroways           |
+| `src/visualization/mesh/MeshObjectManager.ts`                      | Manages 3D mesh objects for buildings, vegetation, structures, barriers |
 
 ### Configuration
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/config.ts` | 84-99 | contextDataConfig: zoom, ring radius, concurrency, timeout, endpoint |
-| `src/config.ts` | 104-158 | colorPalette, buildingHeightDefaults, material colors, roof colors |
-| `src/config.ts` | 189-290 | structureDefaults, barrierDefaults, vegetationMeshConfig |
-| `src/config.ts` | 295-348 | groundColors: landuse and water colors |
-| `src/config.ts` | 353-429 | roadSpec, surfaceColors, railwaySpec, waterwayWidthsMeters |
+| File            | Lines   | Purpose                                                              |
+| --------------- | ------- | -------------------------------------------------------------------- |
+| `src/config.ts` | 84-99   | contextDataConfig: zoom, ring radius, concurrency, timeout, endpoint |
+| `src/config.ts` | 104-158 | colorPalette, buildingHeightDefaults, material colors, roof colors   |
+| `src/config.ts` | 189-290 | structureDefaults, barrierDefaults, vegetationMeshConfig             |
+| `src/config.ts` | 295-348 | groundColors: landuse and water colors                               |
+| `src/config.ts` | 353-429 | roadSpec, surfaceColors, railwaySpec, waterwayWidthsMeters           |
 
 ### Testing
 

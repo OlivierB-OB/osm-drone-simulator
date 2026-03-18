@@ -1,4 +1,5 @@
-import type { RailwayVisual, HexColor } from '../../data/contextual/types';
+import type { RailwayVisual } from './types';
+import type { HexColor } from '../sharedTypes';
 import { railwaySpec } from '../../config';
 import type { LineString } from 'geojson';
 

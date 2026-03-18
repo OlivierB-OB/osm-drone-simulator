@@ -1,11 +1,11 @@
 import type { FeatureModule } from '../types';
-import type { BuildingVisual } from '../../data/contextual/types';
 import type { Object3D } from 'three';
-import type { ContextDataTile } from '../sharedTypes';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { classifyBuilding } from './buildingStrategy';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import booleanContains from '@turf/boolean-contains';
+import type { BuildingVisual, ModuleFeatures } from './types';
+import type { LineString, Point, Polygon } from 'geojson';
 
 function markBuildingParents(buildings: BuildingVisual[]): void {
   const nonParts = buildings.filter(
@@ -25,10 +25,12 @@ function markBuildingParents(buildings: BuildingVisual[]): void {
   }
 }
 
-export const buildingModule: FeatureModule<BuildingVisual> = {
-  name: 'building',
-  featureKey: 'buildings',
+export const buildingModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 10,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { buildings: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [
@@ -45,20 +47,25 @@ export const buildingModule: FeatureModule<BuildingVisual> = {
     return !!(tags.building || tags['building:part']);
   },
 
-  classify(id, tags, geometry): BuildingVisual {
-    return classifyBuilding(id, tags, geometry);
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
+    const feature = classifyBuilding(id, tags, geometry);
+    if (feature) features.buildings.push(feature);
   },
 
-  postProcess(features: ContextDataTile['features']): void {
+  postProcess(features: ModuleFeatures): void {
     markBuildingParents(features.buildings);
   },
 
   createMeshes(
-    features: BuildingVisual[],
-    _allFeatures: ContextDataTile['features'],
+    features: ModuleFeatures,
     elevationSampler: ElevationSampler
   ): Object3D[] {
     const factory = new BuildingMeshFactory(elevationSampler);
-    return factory.create(features);
+    return factory.create(features.buildings);
   },
 };

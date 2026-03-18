@@ -1,6 +1,6 @@
-import type { AerowayVisual } from '../../data/contextual/types';
 import { groundColors } from '../../config';
 import type { LineString, Point, Polygon } from 'geojson';
+import type { AerowayVisual } from './types';
 
 export const AEROWAY_TYPES = new Set([
   'aerodrome',

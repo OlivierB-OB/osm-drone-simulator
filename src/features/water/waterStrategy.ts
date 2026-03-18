@@ -1,4 +1,5 @@
-import type { WaterVisual, HexColor } from '../../data/contextual/types';
+import type { WaterVisual } from './types';
+import type { HexColor } from '../sharedTypes';
 import { groundColors, waterwayWidthsMeters } from '../../config';
 import type { LineString, Polygon } from 'geojson';
 

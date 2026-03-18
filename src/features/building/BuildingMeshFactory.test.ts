@@ -3,7 +3,7 @@ import { Group, Mesh } from 'three';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import type { Polygon } from 'geojson';
-import type { BuildingVisual } from '../../data/contextual/types';
+import type { BuildingVisual } from './types';
 
 // Simple rectangle polygon for testing
 const rectanglePolygon: Polygon = {

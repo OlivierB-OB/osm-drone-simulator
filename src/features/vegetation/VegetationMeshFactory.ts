@@ -1,5 +1,5 @@
 import type { Object3D } from 'three';
-import type { VegetationVisual } from '../../data/contextual/types';
+import type { VegetationVisual } from './types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import type { IVegetationStrategy } from './meshStrategies/types';
 import { ForestStrategy } from './meshStrategies/ForestStrategy';

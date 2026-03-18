@@ -1,4 +1,5 @@
-import type { RoadVisual, HexColor } from '../../data/contextual/types';
+import type { RoadVisual } from './types';
+import type { HexColor } from '../sharedTypes';
 import { roadSpec, surfaceColors } from '../../config';
 import type { LineString } from 'geojson';
 

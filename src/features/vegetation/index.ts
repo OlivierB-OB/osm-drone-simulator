@@ -1,18 +1,20 @@
-import type { FeatureModule } from '../types';
-import type { VegetationVisual } from '../../data/contextual/types';
+import type { CanvasDrawContext, FeatureModule } from '../types';
 import type { Object3D } from 'three';
-import type { ContextDataTile } from '../sharedTypes';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { classifyVegetation } from './vegetationStrategy';
 import { drawVegetation } from './canvas';
 import { VegetationMeshFactory } from './VegetationMeshFactory';
 import { NATURAL_LANDUSE_TYPES } from '../landuse/landuseStrategy';
+import type { ModuleFeatures } from './types';
+import type { Point, LineString, Polygon } from 'geojson';
 
-export const vegetationModule: FeatureModule<VegetationVisual> = {
-  name: 'vegetation',
-  featureKey: 'vegetation',
+export const vegetationModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: 60,
   canvasOrder: 50,
+
+  moduleFeaturesFactory(): ModuleFeatures {
+    return { vegetation: [] };
+  },
 
   overpassFragments(bbox: string): string[] {
     return [
@@ -41,21 +43,26 @@ export const vegetationModule: FeatureModule<VegetationVisual> = {
     return false;
   },
 
-  classify(id, tags, geometry): VegetationVisual | null {
+  classify(
+    id: string,
+    tags: Record<string, string>,
+    geometry: Point | LineString | Polygon,
+    features: ModuleFeatures
+  ): void {
     const isForest = tags.landuse === 'forest';
-    return classifyVegetation(id, tags, geometry, isForest);
+    const feature = classifyVegetation(id, tags, geometry, isForest);
+    if (feature) features.vegetation.push(feature);
   },
 
-  drawCanvas(features, draw): void {
-    drawVegetation(features, draw);
+  drawCanvas(features: ModuleFeatures, draw: CanvasDrawContext): void {
+    drawVegetation(features.vegetation, draw);
   },
 
   createMeshes(
-    features: VegetationVisual[],
-    _allFeatures: ContextDataTile['features'],
+    features: ModuleFeatures,
     elevationSampler: ElevationSampler
   ): Object3D[] {
     const factory = new VegetationMeshFactory(elevationSampler);
-    return factory.create(features);
+    return factory.create(features.vegetation);
   },
 };

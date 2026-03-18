@@ -1,4 +1,4 @@
-import type { LanduseVisual } from '../../data/contextual/types';
+import type { LanduseVisual } from './types';
 import { groundColors } from '../../config';
 import type { Polygon } from 'geojson';
 

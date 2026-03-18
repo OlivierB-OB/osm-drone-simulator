@@ -1,23 +1,29 @@
 import type { FeatureModule } from '../types';
 import type { Object3D } from 'three';
-import type { ContextDataTile } from '../sharedTypes';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { BridgeMeshFactory } from './BridgeMeshFactory';
+import type { ModuleFeatures } from './types';
+import { roadModule } from '../road';
+import { railwayModule } from '../railway';
 
-export const bridgeModule: FeatureModule = {
-  name: 'bridge',
-  featureKey: 'roads', // reads from roads (and railways via allFeatures)
+export const bridgeModule: FeatureModule<ModuleFeatures> = {
   classifyPriority: Infinity, // never classifies
 
+  moduleFeaturesFactory(): ModuleFeatures {
+    return {
+      ...roadModule.moduleFeaturesFactory(),
+      ...railwayModule.moduleFeaturesFactory(),
+    };
+  },
+
   createMeshes(
-    _features: unknown[],
-    allFeatures: ContextDataTile['features'],
+    features: ModuleFeatures,
     elevationSampler: ElevationSampler
   ): Object3D[] {
     const factory = new BridgeMeshFactory(elevationSampler);
     return [
-      ...factory.createFromRoads(allFeatures.roads),
-      ...factory.createFromRailways(allFeatures.railways),
+      ...factory.createFromRoads(features.roads),
+      ...factory.createFromRailways(features.railways),
     ];
   },
 };

@@ -1,8 +1,8 @@
 import { BoxGeometry, MeshLambertMaterial, Mesh, type Object3D } from 'three';
-import type { BarrierVisual } from '../../data/contextual/types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import { mercatorToThreeJs } from '../../gis/types';
 import { barrierDefaults, barrierMaterialColors } from '../../config';
+import type { BarrierVisual } from './types';
 
 /**
  * Creates 3D meshes for barriers (walls, city walls, retaining walls, hedges)

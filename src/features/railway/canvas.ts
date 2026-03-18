@@ -1,4 +1,4 @@
-import type { RailwayVisual } from '../../data/contextual/types';
+import type { RailwayVisual } from './types';
 import type { CanvasDrawContext } from '../types';
 import { drawLineString } from '../canvasHelpers';
 

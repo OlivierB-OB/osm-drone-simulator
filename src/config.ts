@@ -106,7 +106,7 @@ export const contextDataConfig: TileDataConfig & {
   queryTimeout: 30000,
 
   // Overpass API endpoint
-  overpassEndpoint: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  overpassEndpoint: 'https://lambert.openstreetmap.de/api/interpreter',
 };
 
 /**
