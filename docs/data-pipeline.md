@@ -7,7 +7,7 @@ The drone simulator uses a consistent **five-stage pipeline pattern** for all ti
 | Pipeline | Source | Output |
 |----------|--------|--------|
 | **Elevation** | AWS Terrarium PNG tiles | 3D terrain geometry |
-| **Contextual** | OpenStreetMap (Overpass API) | Canvas texture + 3D objects |
+| **Contextual** | Overture Maps (PMTiles) | Canvas texture + 3D objects |
 
 **Why tiles?** Web Mercator z/x/y tiles allow constant-memory streaming: only the tiles around the drone are loaded, the rest are evicted. The ring radius determines how many tiles surround the center tile (radius 1 = 3×3 = 9 tiles).
 
@@ -45,7 +45,7 @@ Each stage communicates via typed events (`tileAdded` / `tileRemoved`) or direct
 
 **Tile key format**: `"z:x:y"` (e.g., `"15:16832:11432"`)
 
-**ContextDataManager specifics**: Overpass API has tight rate limits. ContextDataManager maintains a timeout queue to handle 429 responses without hammering the server.
+**ContextDataManager specifics**: ContextDataManager uses PMTiles archives (no rate limits). It maintains a pending queue with timeout to handle slow responses and concurrency control.
 
 **Configuration** (in `src/config.ts`):
 ```typescript
@@ -68,11 +68,11 @@ The Loader is responsible for fetching a single tile, with caching and retry log
 
 1. **In-memory `tileCache` Map** — session-scoped, fastest; checked by the Manager before the Loader is called
 2. **IndexedDB persistence cache** — survives page reloads; checked by `loadWithPersistenceCache()` via `ElevationTilePersistenceCache` / `ContextTilePersistenceCache`
-3. **Network fetch** — AWS Terrarium PNG (elevation) or Overpass API GeoJSON (contextual)
+3. **Network fetch** — AWS Terrarium PNG (elevation) or Overture PMTiles MVT (contextual)
 
 `tileLoaderUtils.ts` provides the `loadWithPersistenceCache()` helper that orchestrates the IndexedDB check + network fallback + write-back pattern. Cache errors are silently swallowed — the cache is an optional optimization, not a critical path.
 
-**Retry logic**: Up to **3 attempts** with exponential backoff (`100ms × 2^attempt`). For Overpass API 429 rate-limit responses, a separate 1-second backoff is applied and retries are capped at 1.
+**Retry logic**: Up to **3 attempts** with exponential backoff (`100ms × 2^attempt`).
 
 **Abort propagation**: Each Loader call accepts an `AbortSignal` from the Manager's `AbortController`, so in-flight requests cancel cleanly when a tile leaves the ring.
 
@@ -80,7 +80,7 @@ The Loader is responsible for fetching a single tile, with caching and retry log
 
 ## Stage 3 — Parser (data decoding)
 
-**Files**: `src/data/elevation/ElevationDataTileParser.ts`, `src/data/contextual/ContextDataTileParser.ts`, `src/data/contextual/strategies/`
+**Files**: `src/data/elevation/ElevationDataTileParser.ts`, `src/data/contextual/pmtiles/OvertureParser.ts`, `src/features/*/overtureClassify.ts`
 
 Parsers convert raw network bytes into structured data types. They have no Three.js dependencies and are fully testable in isolation.
 
@@ -102,19 +102,18 @@ Output type: `ElevationDataTile` — includes the grid, tile coordinates, zoom l
 
 ### Contextual parser
 
-`ContextDataTileParser` parses OverpassJSON (a GeoJSON variant) into a structured feature map. It delegates to **9 strategy modules** in `src/data/contextual/strategies/`:
+`OvertureParser` parses decoded MVT layers from Overture Maps PMTiles into a structured feature map. It routes each MVT layer to the appropriate classifier function by layer name (8 layer handlers):
 
-| Strategy file | Feature type |
-|---------------|-------------|
-| `buildingStrategy.ts` | Buildings (footprints, heights, roof shapes) |
-| `roadStrategy.ts` | Roads and highways |
-| `railwayStrategy.ts` | Railways and tracks |
-| `waterStrategy.ts` | Water bodies and waterways |
-| `vegetationStrategy.ts` | Trees, forests, vegetation |
-| `landuseStrategy.ts` | Land use areas (farmland, parks, etc.) |
-| `aerowayStrategy.ts` | Airports, runways, taxiways |
-| `structureStrategy.ts` | Man-made structures (towers, masts, cranes) |
-| `barrierStrategy.ts` | Barriers (walls, hedges) |
+| MVT Layer | Classifier | Feature type |
+|-----------|-----------|-------------|
+| `building` | `classifyOvertureBuilding` | Buildings (footprints, heights, roof shapes) |
+| `building_part` | `classifyOvertureBuilding` | Building parts |
+| `segment` | `classifyOvertureRoad` / `classifyOvertureRailway` | Roads, railways |
+| `land_use` | `classifyOvertureLanduse` | Land use areas |
+| `land` | `classifyOvertureLanduse` / `classifyOvertureVegetation` | Land features |
+| `land_cover` | `classifyOvertureVegetation` | Vegetation cover |
+| `infrastructure` | `classifyOvertureAeroway` | Aeroways |
+| `water` | `classifyOvertureWater` | Water bodies and waterways |
 
 Output type: `ContextDataTile` — includes `features` grouped by category, tile coordinates, Mercator bounds, and color palette.
 
@@ -256,10 +255,10 @@ flowchart LR
 
 | | Elevation | Contextual (texture) | Contextual (objects) |
 |--|-----------|---------------------|----------------------|
-| **Source** | AWS Terrarium PNG | Overpass API GeoJSON | Overpass API GeoJSON |
+| **Source** | AWS Terrarium PNG | Overture Maps PMTiles | Overture Maps PMTiles |
 | **Manager** | `ElevationDataManager` | `ContextDataManager` | `ContextDataManager` |
 | **Loader** | `ElevationDataTileLoader` | `ContextDataTileLoader` | `ContextDataTileLoader` |
-| **Parser** | `ElevationDataTileParser` | `ContextDataTileParser` (9 strategies) | `ContextDataTileParser` (9 strategies) |
+| **Parser** | `ElevationDataTileParser` | `OvertureParser` (7 classifiers) | `OvertureParser` (7 classifiers) |
 | **Factory** | `TerrainGeometryFactory` → `TerrainObjectFactory` | `TerrainTextureFactory` → `TerrainCanvasRenderer` | `BuildingMeshFactory`, `VegetationMeshFactory`, etc. |
 | **TileObjectManager** | `TerrainGeometryObjectManager` → `TerrainObjectManager` | `TerrainTextureObjectManager` → `TerrainObjectManager` | `MeshObjectManager` |
 | **Scene output** | Terrain mesh | Texture on terrain mesh | Buildings, trees, structures |
@@ -273,7 +272,7 @@ flowchart LR
 | Elevation tile fails (all retries) | `null` propagated; no crash; terrain mesh not created for that tile |
 | Context tile fails | `null` stored in `TerrainTextureObjectManager`; mesh rendered with flat color |
 | Null texture | Does **not** emit `tileAdded` from `TerrainTextureObjectManager`; no rebuild triggered |
-| Overpass 429 rate limit | 1-second backoff, max 1 retry; tile skipped, queue continues |
+| PMTiles network failure | Exponential backoff retry (3 attempts); tile skipped on final failure |
 | IndexedDB unavailable | Warning logged; falls through to network fetch |
 
 ---

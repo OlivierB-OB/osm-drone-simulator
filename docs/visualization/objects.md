@@ -2,7 +2,7 @@
 
 ## Overview
 
-The simulator visualizes five categories of real-world objects extracted from OpenStreetMap data. Each type is rendered as 3D geometry in the Three.js scene using specialized mesh factories that transform geographic data into spatial meshes.
+The simulator visualizes five categories of real-world objects extracted from Overture Maps data. Each type is rendered as 3D geometry in the Three.js scene using specialized mesh factories that transform geographic data into spatial meshes.
 
 **Object Categories:**
 
@@ -19,8 +19,8 @@ The 3D objects system follows the standard **Data Pipeline Pattern**
 
 ```mermaid
 flowchart TD
-    OSM["OSM Feature Data<br/>(GeoJSON)"]
-    OSM --> Parser["ContextDataTileParser<br/>(Feature extraction &<br/>classification)"]
+    OV["Overture Maps Data<br/>(MVT via PMTiles)"]
+    OV --> Parser["OvertureParser<br/>(Feature extraction &<br/>classification)"]
 
     Parser --> Factories["Feature-Specific Factories"]
 
@@ -55,7 +55,7 @@ Buildings appear as 3D extruded structures with vertical walls and roofs. They r
 
 ### Data Sources
 
-Buildings are identified by OSM tags:
+Buildings are identified by Overture fields:
 - `building=*` (type: house, residential, commercial, office, etc.)
 - `height` or `building:levels` (determines wall height)
 - `roof:shape` (flat, gabled, hipped, pyramidal, dome, onion, cone, etc.)
@@ -130,7 +130,7 @@ Vegetation appears as distributed trees, forests, shrubs, and cultivated areas. 
 
 ### Data Sources
 
-Vegetation areas identified by OSM tags:
+Vegetation areas identified by Overture fields:
 - `natural=forest`, `wood`, `scrub`, `heath`, `grassland`
 - `landuse=forest`, `wood`, `vineyard`, `orchard`
 - `leaf_type=deciduous` or `needleleaved` (determines canopy shape)
@@ -226,7 +226,7 @@ Structures appear as distinctive man-made objects: towers rise as cylinders or t
 
 ### Data Sources
 
-Structures identified by OSM tags:
+Structures identified by Overture fields:
 - `man_made=tower`, `chimney`, `mast`, `water_tower`, `silo`, `storage_tank`, `lighthouse`, `crane`
 - `power=tower`, `pole`, `generator` (with subtypes)
 - `aerialway=pylon`
@@ -309,7 +309,7 @@ Barriers appear as linear features running across the landscape. Walls are thin,
 
 ### Data Sources
 
-Barriers identified by OSM tags:
+Barriers identified by Overture fields:
 - `barrier=wall`, `city_wall`, `retaining_wall`, `fence`, `hedge`, `guardrail`
 - `height` tag (in meters)
 - `width` tag (in meters, defaults based on type)
@@ -381,7 +381,7 @@ Bridges appear as elevated flat decks spanning roads and railways. They float ab
 
 ### Data Sources
 
-Bridges identified by OSM tags:
+Bridges identified by Overture fields:
 - `bridge=yes` on `highway=*` or `railway=*` features
 - `layer=N` (integer, default 1) — vertical separation in multiples of 5m per layer
 - `width` tag for road width, default rail width from `railway=*` type
@@ -444,9 +444,9 @@ Examples:
 
 ```mermaid
 flowchart TD
-    OSM["OSM Tile Data<br/>(GeoJSON)"]
+    OV["Overture Tile Data<br/>(MVT via PMTiles)"]
 
-    OSM --> Parse["STAGE 1:<br/>Feature Extraction<br/>(Parser)<br/>• Identify types from tags<br/>• Extract geometry<br/>• Parse properties"]
+    OV --> Parse["STAGE 1:<br/>Feature Extraction<br/>(OvertureParser)<br/>• Identify types from fields<br/>• Extract geometry<br/>• Parse properties"]
 
     Parse --> Meshes["STAGE 2:<br/>Mesh Creation<br/>(Factories with Strategies)<br/>BuildingMeshFactory<br/>VegetationMeshFactory<br/>StructureMeshFactory<br/>BarrierMeshFactory<br/>BridgeMeshFactory"]
 
@@ -459,8 +459,8 @@ flowchart TD
 
 ### Stage 1: Data Parsing
 
-- **Input**: GeoJSON tile with feature collection from Overpass API
-- **Process**: Parser identifies each feature's type using OSM tags (e.g., `building=residential`, `natural=forest`)
+- **Input**: MVT tile data from Overture Maps PMTiles
+- **Process**: OvertureParser identifies each feature's type using Overture fields (e.g., `class`, `subtype`)
 - **Output**: Typed feature objects (`BuildingVisual`, `VegetationVisual`, `StructureVisual`, etc.) with extracted properties
 
 ### Stage 2: Mesh Creation

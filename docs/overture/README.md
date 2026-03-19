@@ -38,6 +38,22 @@ These fields appear across multiple themes and follow consistent conventions:
 
 Overture data is distributed as **GeoParquet** files partitioned by theme and region. Each row is a GeoJSON-compatible feature with a `geometry` column (WKB-encoded) and typed property columns.
 
+## Current Usage
+
+The simulator consumes a subset of the full Overture schema. This document serves as a reference for all available fields; the actual fields used by the classifier functions are:
+
+| Theme | Consumed Fields | Classifier |
+|-------|----------------|------------|
+| buildings | `height`, `num_floors`, `roof_shape`, `class`, `subtype` | `classifyOvertureBuilding` |
+| transportation | `class`, `subclass`, `road_surface` | `classifyOvertureRoad`, `classifyOvertureRailway` |
+| base (land_use) | `class`, `subtype` | `classifyOvertureLanduse` |
+| base (land) | `subtype` | `classifyOvertureLanduse`, `classifyOvertureVegetation` |
+| base (land_cover) | `subtype` | `classifyOvertureVegetation` |
+| base (water) | `class`, `subtype` | `classifyOvertureWater` |
+| base (infrastructure) | `class` | `classifyOvertureAeroway` |
+
+Cross-cutting fields like `id`, `bbox`, and `sources` are available but not directly used for rendering. The `source_tags` field preserves upstream OSM tags if needed for future classification refinements.
+
 ## See Also
 
 - [coordinate-system.md](../coordinate-system.md) — how Overture coordinates map to the Three.js scene

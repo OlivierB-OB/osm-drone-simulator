@@ -33,7 +33,7 @@ This document records the key technology decisions made for the drone simulator 
 
 **Constraints Addressed:**
 - Custom shaders can be added if performance optimization needed in future
-- Supports dynamic mesh generation (terrain tiles, OSM buildings)
+- Supports dynamic mesh generation (terrain tiles, buildings)
 
 ---
 

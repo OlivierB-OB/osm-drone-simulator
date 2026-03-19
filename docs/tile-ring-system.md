@@ -90,14 +90,16 @@ export const contextDataConfig = {
   // Number of tiles in each direction from center
   ringRadius: 1,
 
-  // Maximum concurrent Overpass API requests
-  maxConcurrentLoads: 3,
+  // Maximum concurrent PMTiles requests
+  maxConcurrentLoads: 6,
 
   // Query timeout in milliseconds
   queryTimeout: 30000,
 
-  // Overpass API endpoint for OSM features
-  overpassEndpoint: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  // Overture Maps PMTiles configuration
+  overtureVersion: '2026-02-18.0',
+  overtureBaseUrl: 'https://tiles.overturemaps.org',
+  overtureThemes: ['buildings', 'transportation', 'base'],
 };
 ```
 

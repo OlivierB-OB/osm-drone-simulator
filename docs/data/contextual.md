@@ -2,118 +2,176 @@
 
 ## Overview
 
-The drone simulator uses **OpenStreetMap (OSM)** data fetched via the **Overpass API** to render the environment's features and landmarks. This system provides:
+The drone simulator uses **Overture Maps Foundation** data served as **PMTiles archives** to render the environment's features and landmarks. This system provides:
 
-- **Real-world buildings, roads, railways, water** and other structures
+- **Real-world buildings, roads, railways, water** and other structures from 3 Overture themes (buildings, transportation, base)
 - **Efficient tile loading** using Web Mercator projection with z/x/y coordinates at zoom level 15
-- **Ring-based caching** around the drone to minimize API requests
+- **Ring-based caching** around the drone to minimize network requests
 - **Dual rendering** - 2D canvas textures on terrain + 3D meshes in the scene
-- **Graceful degradation** when cache or API is unavailable
+- **Graceful degradation** when cache or network is unavailable
 
-The contextual (OpenStreetMap) system follows the standard **Data Pipeline Pattern**
-(see [`doc/data-pipeline.md`](../data-pipeline.md) for detailed explanation).
+The contextual data system follows the standard **Data Pipeline Pattern**
+(see [`data-pipeline.md`](../data-pipeline.md) for detailed explanation).
 
 ### Contextual Data Pipeline
 
 ```
-OpenStreetMap Data (via Overpass API)
-       ↓
+Overture Maps Data (via PMTiles archives)
+       |
 ContextDataManager (Ring-based loading, caching)
-       ↓
-ContextDataTileParser (GeoJSON parsing, feature classification)
-       ↓
+       |
+ContextDataTileLoader (PMTiles fetch, overzoom, persistence cache)
+       |
+PMTilesReader (multi-archive query, per-archive overzoom)
+       |
+OvertureParser (MVT layer routing, feature classification)
+       |
 Feature Categories:
-  - Buildings, Roads, Waterways, Vegetation, Aeroway, Railways
-       ↓
+  - Buildings, Roads, Waterways, Vegetation, Aeroway, Railways, Landuse
+       |
 MeshObjectManager (3D buildings, trees, structures)
 TerrainTextureObjectManager (Canvas rendering for texture)
-       ↓
+       |
 Textured Terrain + 3D Objects in Scene
 ```
 
-For the general Manager → Parser → Factory pattern and how it applies across
+For the general Manager -> Loader -> Parser -> Factory pattern and how it applies across
 the system, see the Data Pipeline Pattern documentation.
 
-## Data Source & Fetching
+## Data Source & Format
 
-### OpenStreetMap & Overpass API
+### Overture Maps Foundation & PMTiles
 
-**Service:** Overpass API - Open-source geospatial query service
-**Available Endpoints:**
+**Source:** [Overture Maps Foundation](https://overturemaps.org/) - open map data with a structured, versioned schema
 
-- `https://overpass-api.de/api/interpreter` (primary)
-- `https://maps.mail.ru/osm/tools/overpass/api/interpreter` (Mirror, currently used)
+**Format:** PMTiles archives containing MVT (Mapbox Vector Tiles) decoded via `@mapbox/vector-tile` + `pbf`
 
-**License:** [Open Data Commons Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/)
+**URL pattern:** `{baseUrl}/{version}/{theme}.pmtiles`
 
-Overpass API is a read-only service allowing complex spatial queries of OpenStreetMap data. It returns geospatial features in OverpassJSON format (GeoJSON variant).
+Example: `https://tiles.overturemaps.org/2026-02-18.0/buildings.pmtiles`
 
-### Why Overpass API?
+**License:** Community-contributed open data (see Overture Maps licensing)
 
-- **Global coverage** - all OSM data for any location
-- **Structured queries** - fetch specific feature types (buildings, roads, water, etc.)
-- **Geospatial queries** - bounding box filtering at tile scale
-- **Open source** - no API keys required
-- **OverpassQL language** - powerful, well-documented query syntax
-- **Reliable mirrors** - multiple endpoints available for redundancy
+Unlike OSM's free-form key/value tags, Overture data is strongly typed with explicit field names, types, and enumerations. See [`overture/README.md`](../overture/README.md) for schema reference.
+
+### Why Overture Maps / PMTiles?
+
+- **Strongly typed** - structured schema with explicit fields (not free-form tags)
+- **No rate limits** - PMTiles are pre-packaged static archives, no API quotas
+- **Pre-packaged** - no query language needed; tiles fetched by z/x/y coordinates
+- **Global coverage** - worldwide feature data for any location
+- **Versioned releases** - reproducible data with release identifiers
+- **Efficient** - binary MVT format, range requests on single archive files
 
 ### Ring-Based Loading
 
 The system maintains a **ring of tiles** around the drone's current position. Tiles load as the drone approaches ring edges and unload when it leaves, keeping memory usage constant and network requests minimal.
 
-For detailed ring patterns, lifecycle, lifecycle phases, and spatial organization, see [`doc/tile-ring-system.md`](../tile-ring-system.md).
+For detailed ring patterns, lifecycle phases, and spatial organization, see [`tile-ring-system.md`](../tile-ring-system.md).
 
-**Configuration** (in `src/config.ts`):
+## Configuration
+
+All contextual data settings are in `src/config.ts` (`contextDataConfig`):
 
 ```typescript
 contextDataConfig = {
-  zoomLevel: 15, // Detail level: zoom 15
-  ringRadius: 1, // Number of tiles in each direction (3×3 grid)
-  maxConcurrentLoads: 3, // Max simultaneous Overpass requests
-  queryTimeout: 30000, // Query timeout in milliseconds
-  overpassEndpoint: '...', // Overpass API endpoint
+  zoomLevel: 15,            // Web Mercator zoom level (overzoom from maxZoom 13/14)
+  ringRadius: 1,            // Number of tiles in each direction (3x3 grid)
+  maxConcurrentLoads: 6,    // Max simultaneous PMTiles requests (no rate limits)
+  queryTimeout: 30000,      // Query timeout in milliseconds
+
+  // Overture Maps PMTiles
+  overtureVersion: '2026-02-18.0',
+  overtureBaseUrl: 'https://tiles.overturemaps.org',
+  overtureThemes: ['buildings', 'transportation', 'base'],
 };
 ```
 
-### Performance Strategy
+| Setting                   | Purpose                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| **zoomLevel: 15**         | Detail level; ~1.22 km x 1.22 km per tile (Web Mercator)                       |
+| **ringRadius: 1**         | 3x3 grid = 9 tiles total; expands to 5x5 (25 tiles) if set to 2               |
+| **maxConcurrentLoads: 6** | Higher than elevation (3) since PMTiles have no rate limits                     |
+| **queryTimeout: 30000**   | 30-second timeout per tile load                                                 |
+| **Ring updates**          | Only when drone crosses tile boundary, not continuously                         |
 
-| Setting                   | Purpose                                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------------------- |
-| **zoomLevel: 15**         | Balances detail vs. performance; ~1.22 km × 1.22 km per tile (Web Mercator); often rounded to ~2 km |
-| **ringRadius: 1**         | 3×3 grid = 9 tiles total; expands to 5×5 (25 tiles) if set to 2                                     |
-| **maxConcurrentLoads: 3** | Respects Overpass API rate limits; prevents network saturation                                      |
-| **queryTimeout: 30000**   | 30-second timeout per query (Overpass can be slow for large tiles)                                  |
-| **Ring updates**          | Only when drone crosses tile boundary, not continuously                                             |
+## PMTiles & Overzoom Architecture
 
-### Query Generation
+### PMTilesReader
 
-The system generates **OverpassQL queries** that request all 9 feature types within a tile's bounding box:
+`PMTilesReader` holds one `PMTiles` instance per Overture theme and queries all archives in parallel for each tile request.
 
 ```
-Example query structure:
-[out:json][timeout:30];(
-  node["building"](bbox);      // Building nodes
-  way["building"](bbox);       // Building ways (closed polygons)
-  relation["building"](bbox);  // Building relations (complex multipart)
-  way["highway"](bbox);        // Road network
-  way["railway"](bbox);        // Railway network
-  way["natural"="water"](bbox);  // Water bodies
-  way["landuse"](bbox);        // Land use areas
-  ... [9 feature types total]
-);
-out;>;
-out qt;
+PMTilesReader
+  |-- buildings.pmtiles  (maxZoom: 14)
+  |-- transportation.pmtiles  (maxZoom: 13)
+  |-- base.pmtiles  (maxZoom: 13)
 ```
 
-**Response:** OverpassJSON containing nodes, ways, and relations for all matching features
+Each archive is constructed from the URL pattern `{baseUrl}/{version}/{theme}.pmtiles` and opened via `FetchSource` (HTTP range requests).
 
-### Caching Layers
+### Per-Archive Overzoom
 
-The system implements **three-tier caching**:
+Each PMTiles archive has an independent `maxZoom` declared in its header. When the requested zoom level (15) exceeds an archive's maxZoom, the reader transparently handles overzoom per-archive:
+
+```
+Requested: z=15, x=16832, y=11432
+
+buildings.pmtiles (maxZoom=14):
+  dz = 15 - 14 = 1
+  fetch parent: z=14, x=8416, y=5716
+
+transportation.pmtiles (maxZoom=13):
+  dz = 15 - 13 = 2
+  fetch parent: z=13, x=4208, y=2858
+
+base.pmtiles (maxZoom=13):
+  dz = 15 - 13 = 2
+  fetch parent: z=13, x=4208, y=2858
+```
+
+Archives at the same effective zoom share one group during parsing. This ensures high-resolution archives (buildings at Z:14) are not downgraded to match lower-resolution ones (transport at Z:13).
+
+### Effective Data Zoom
+
+```
+effectiveDataZoom = Math.max(...allArchiveMaxZooms)
+```
+
+This is the highest zoom level at which any theme has native data. It determines whether tile-level overzoom (parent fetch + fan-out) is needed in the loader.
+
+### Parent Fetch + Fan-Out
+
+When `ContextDataTileLoader` detects overzoom (requested Z > effectiveDataZoom), it:
+
+1. **Computes parent coordinates** by right-shifting: `parentX = x >> dz`, `parentY = y >> dz`
+2. **Fetches the parent tile** via `PMTilesReader.getTile(parentCoords)`
+3. **Parses all features** from the parent tile
+4. **Fans out** features to all child sub-tiles using `filterFeaturesByBounds`
+5. **Pre-caches siblings** in IndexedDB (fire-and-forget) so adjacent tiles load instantly
+
+### Deduplication
+
+A static `parentFetches` Map on `ContextDataTileLoader` prevents concurrent duplicate parent requests. When multiple child tiles request the same parent simultaneously, only one network fetch occurs. The promise is shared and cleaned up after resolution.
+
+```
+Tile 15:16832:11432 --|
+Tile 15:16833:11432 --|-- share parent fetch for 14:8416:5716
+Tile 15:16832:11433 --|
+Tile 15:16833:11433 --|
+```
+
+### Bounds Filtering
+
+`featureBoundsFilter.ts` clips features to sub-tile bounds using an "any coordinate" overlap check. For each feature, if at least one coordinate falls within the sub-tile's Mercator bounds, the feature is included. This is an approximate check sufficient for small sub-tiles.
+
+## Caching
+
+The system implements **two-tier caching**:
 
 1. **In-memory cache** (RAM)
    - Fastest access during gameplay
-   - Stores parsed ContextDataTile objects
+   - Stores parsed `ContextDataTile` objects
    - Automatically cleared when tiles leave the ring
 
 2. **IndexedDB persistent cache** (browser storage)
@@ -123,215 +181,135 @@ The system implements **three-tier caching**:
    - Automatic expiry cleanup on app startup
    - Gracefully falls back to network if expired
 
-3. **Overpass API** (network)
-   - Fallback when cache misses occur
-   - Includes **exponential backoff retry** (3 attempts)
-   - Special handling for rate-limit responses (429)
-
-**Cache Hierarchy Example:**
+**Cache flow:**
 
 ```
-Load tile 15:16384:10741
-  ↓ (miss)
+Load tile 15:16832:11432
+  | (miss in-memory)
 Check IndexedDB persistence cache
-  ↓ (miss or expired)
-Fetch from Overpass API with retries
-  ↓ (success)
+  | (miss or expired)
+Fetch from PMTiles (with overzoom if needed)
+  | (success)
 Store in IndexedDB (24-hour TTL)
 Store in memory cache
-  ↓
+  |
 Return parsed ContextDataTile
 ```
 
+The `loadWithPersistenceCache` utility (in `src/data/shared/tileLoaderUtils.ts`) orchestrates the IndexedDB check + network fallback + write-back pattern, shared with the elevation system.
+
+## Feature Classification Pipeline
+
+### MVT Layer Routing
+
+`OvertureParser` receives decoded MVT layers from all Overture themes and routes each layer to the appropriate classification function:
+
+```
+PMTiles Archives (buildings, transportation, base)
+       |
+PMTilesReader.getTile() -- parallel fetch, per-archive overzoom
+       |
+ArchiveGroup[] (grouped by fetch coordinates)
+       |
+OvertureParser.parse()
+  |-- "building"        -> processBuildings()
+  |-- "building_part"   -> processBuildings(isPart=true)
+  |-- "segment"         -> processTransportSegments()
+  |-- "land_use"        -> processLandUse()
+  |-- "land"            -> processLand()
+  |-- "land_cover"      -> processLandCover()
+  |-- "infrastructure"  -> processInfrastructure()
+  |-- "water"           -> processWater()
+       |
+ModulesFeatures (buildings, roads, railways, waters, airports, vegetation, landuse)
+       |
+  FeatureModuleRegistry
+  |-- drawAllCanvas() -> 2D canvas texture
+  |-- createAllMeshes() -> 3D scene objects
+```
+
+### Classifiers
+
+Seven classifier functions in `src/features/*/overtureClassify.ts` convert MVT feature properties into typed visual features:
+
+| Classifier | File | Overture Fields |
+|------------|------|-----------------|
+| `classifyOvertureBuilding` | `src/features/building/overtureClassify.ts` | `height`, `num_floors`, `roof_shape`, `class` |
+| `classifyOvertureRoad` | `src/features/road/overtureClassify.ts` | `class`, `subclass`, `road_surface` |
+| `classifyOvertureRailway` | `src/features/railway/overtureClassify.ts` | `class` (rail, tram, metro, etc.) |
+| `classifyOvertureWater` | `src/features/water/overtureClassify.ts` | `class`, `subtype` |
+| `classifyOvertureAeroway` | `src/features/aeroway/overtureClassify.ts` | `class` (runway, taxiway, helipad, etc.) |
+| `classifyOvertureLanduse` | `src/features/landuse/overtureClassify.ts` | `class`, `subtype` |
+| `classifyOvertureVegetation` | `src/features/vegetation/overtureClassify.ts` | `subtype` (forest, wood, scrub, heath) |
+
+### Transport Segment Routing
+
+The `segment` MVT layer contains both roads and railways. `OvertureParser` routes by `class`:
+
+- **Rail classes** (`rail`, `narrow_gauge`, `light_rail`, `tram`, `metro`, `monorail`, `funicular`, `disused`, `abandoned`) -> `classifyOvertureRailway`
+- **All others** -> `classifyOvertureRoad`
+
+### Land Layer Routing
+
+The `land` MVT layer routes by `subtype`:
+
+- **Vegetation subtypes** (`forest`, `wood`, `scrub`, `heath`) -> `classifyOvertureVegetation`
+- **Other polygon subtypes** -> `classifyOvertureLanduse`
+
+### Feature Module Registry
+
+`FeatureModuleRegistry` (`src/features/registry.ts`) orchestrates canvas drawing and mesh creation. It holds 10 registered modules from `src/features/registration.ts`:
+
+| Module | Canvas | Mesh |
+|--------|--------|------|
+| building | - | Extruded polygon + roof |
+| road | Lines (width by type) | - |
+| railway | Dashed gray lines | - |
+| water | Blue areas / lines | - |
+| aeroway | Colored areas | - |
+| vegetation | Green areas | Trees, shrubs |
+| landuse | Filled background | - |
+| structure | - | Cylinders, boxes, tapers |
+| barrier | - | Extruded walls/hedges |
+| bridge | - | Bridge spans |
+
+### Geometry Conversion
+
+`mvtGeometry.ts` converts MVT tile-local coordinates (0-4096 extent) to absolute Mercator meters using the tile's bounds:
+
+```
+MVT coordinate (tileX, tileY)
+  |
+mercatorX = bounds.minX + (tileX / extent) * (bounds.maxX - bounds.minX)
+mercatorY = bounds.maxY - (tileY / extent) * (bounds.maxY - bounds.minY)
+```
+
+Supports Point, LineString, and Polygon geometry types. Polygon rings are auto-closed if needed.
+
 ## Feature Categories
 
-Nine categories of contextual features are fetched, parsed, and rendered:
+Nine categories of contextual features are parsed and rendered:
 
-| Feature Type   | Canvas (2D)                   | Mesh (3D)                | Key OSM Tags                                          |
-| -------------- | ----------------------------- | ------------------------ | ----------------------------------------------------- |
-| **Buildings**  | Filled polygon                | Extruded polygon + roof  | `building`, `height`, `building:levels`, `roof:shape` |
-| **Roads**      | Colored lines (width by type) | —                        | `highway`, `lanes`, `surface`                         |
-| **Railways**   | Dashed gray lines             | —                        | `railway`, `tracks`                                   |
-| **Water**      | Blue areas / blue lines       | —                        | `waterway`, `natural=water`                           |
-| **Vegetation** | Green areas                   | Trees, shrubs, crowns    | `natural=forest/wood`, `leaf_type`, `leaf_cycle`      |
-| **Landuse**    | Filled background areas       | —                        | `landuse`, `leisure=park`                             |
-| **Aeroways**   | Colored areas                 | —                        | `aeroway`                                             |
-| **Structures** | —                             | Cylinders, boxes, tapers | `man_made`, `power`, `aerialway=pylon`                |
-| **Barriers**   | —                             | Extruded walls/hedges    | `barrier`, `height`, `material`                       |
+| Feature Type   | Canvas (2D)                   | Mesh (3D)                | Overture Source                                    |
+| -------------- | ----------------------------- | ------------------------ | -------------------------------------------------- |
+| **Buildings**  | -                             | Extruded polygon + roof  | `building`, `building_part` layers                 |
+| **Roads**      | Colored lines (width by type) | -                        | `segment` layer (non-rail classes)                 |
+| **Railways**   | Dashed gray lines             | -                        | `segment` layer (rail classes)                     |
+| **Water**      | Blue areas / blue lines       | -                        | `water` layer                                      |
+| **Vegetation** | Green areas                   | Trees, shrubs, crowns    | `land` (forest/wood subtypes), `land_cover` layer  |
+| **Landuse**    | Filled background areas       | -                        | `land_use` layer, `land` (non-vegetation subtypes) |
+| **Aeroways**   | Colored areas                 | -                        | `infrastructure` layer (aeroway classes)           |
+| **Structures** | -                             | Cylinders, boxes, tapers | (post-processing from buildings/features)          |
+| **Barriers**   | -                             | Extruded walls/hedges    | (post-processing from features)                    |
 
 For colors, widths, heights, and detailed rendering specs, see:
 
-- **[Canvas Rendering](../visualization/canvas-rendering.md)** — layer ordering, colors, widths, dash patterns, drawing algorithms
-- **[3D Object Visualization](../visualization/objects.md)** — heights, shapes, geometry, materials, roof types
-
-## Technical Specification
-
-### File Format: OverpassJSON
-
-OverpassJSON is a GeoJSON-compatible format returned by Overpass API containing nodes, ways, and relations.
-
-**Structure:**
-
-```json
-{
-  "version": 0.6,
-  "generator": "Overpass API",
-  "elements": [
-    {
-      "type": "node",
-      "id": 12345,
-      "lat": 48.853,
-      "lon": 2.3499,
-      "tags": { "building": "residential", "height": "10" }
-    },
-    {
-      "type": "way",
-      "id": 67890,
-      "nodes": [12345, 12346, 12347, 12345], // Closed ring for polygon
-      "tags": { "building": "residential" },
-      "geometry": [
-        { "lat": 48.853, "lon": 2.3499 },
-        { "lat": 48.8531, "lon": 2.35 },
-        { "lat": 48.8532, "lon": 2.3499 },
-        { "lat": 48.853, "lon": 2.3499 }
-      ]
-    },
-    {
-      "type": "relation",
-      "id": 11111,
-      "members": [
-        { "type": "way", "ref": 67890, "role": "outer" },
-        { "type": "way", "ref": 67891, "role": "inner" }
-      ],
-      "tags": { "building": "residential" }
-    }
-  ]
-}
-```
-
-### Geometry Types
-
-**Point** - Single lat/lng location
-
-- Used for: point features (tree, tower, utility pole)
-- Example: `{ "type": "Point", "coordinates": [x, y] }`
-
-**LineString** - Ordered sequence of coordinates
-
-- Used for: roads, railways, waterways, barriers
-- Example: `{ "type": "LineString", "coordinates": [[x1, y1], [x2, y2], [x3, y3]] }`
-
-**Polygon** - One or more rings (outer ring + optional holes)
-
-- Used for: buildings, water bodies, landuse areas, vegetation patches
-- First ring = outer boundary; subsequent rings = holes
-- Example: `{ "type": "Polygon", "coordinates": [[[x1, y1], [x2, y2], [x3, y3], [x1, y1]]] }`
-
-### Coordinate System
-
-All coordinates are in **Mercator meters**, matching the elevation system:
-
-- **X** increases eastward
-- **Y** increases northward
-- Conversion from lat/lng: handled by `ContextDataTileLoader.mercatorToLatLng()`
-
-### Tile Dimensions
-
-- **Size:** 256×256 pixels per tile in Web Mercator grid
-- **Coverage at zoom 15:** Approximately 1.22 km × 1.22 km per tile
-- **Precision:** Sub-meter accuracy (coordinate precision matches elevation system)
-
-### Feature Classification
-
-The **strategy pattern** is used to classify OSM tags into visual features:
-
-```
-OSM Element (node/way/relation with tags)
-       ↓
-ContextDataTileParser
-       ↓
-Strategy function (classifyBuilding, classifyRoad, etc.)
-       ↓
-VisualFeature (BuildingVisual, RoadVisual, etc.)
-```
-
-**Strategies** in `src/data/contextual/strategies/`:
-
-- `buildingStrategy.ts` - Classify buildings; extract height, roof, material
-- `roadStrategy.ts` - Classify roads; calculate width, apply surface color
-- `railwayStrategy.ts` - Classify railways; extract track count, dash pattern
-- `waterStrategy.ts` - Classify water; distinguish areas vs. lines
-- `vegetationStrategy.ts` - Classify vegetation; extract height, leaf type
-- `landuseStrategy.ts` - Classify landuse areas; apply colors
-- `aerowayStrategy.ts` - Classify aeroways; identify runway types
-- `structureStrategy.ts` - Classify structures; assign 3D shapes and sizes
-- `barrierStrategy.ts` - Classify barriers; extract material, height
-
-**Tag Matching Priority:**
-Most strategies follow this order:
-
-1. Check for explicit tags (e.g., `height`, `building:levels`)
-2. Check for material/type overrides (e.g., `building:material`)
-3. Use type defaults (e.g., residential building → 6m)
-4. Use fallback defaults (e.g., 6m for unknown types)
-
-## Interpretation & Rendering
-
-### Parsing Pipeline
-
-```
-OverpassJSON
-      ↓
-ContextDataTileParser.parseOSMData()
-      ↓
-Build node map (id → lat/lng)
-Build way map (id → coordinates)
-      ↓
-Iterate elements:
-├─ Nodes → classify point features (trees, towers, etc.)
-├─ Ways → classify linear/polygon features (roads, buildings, etc.)
-└─ Relations → classify complex features (multipart buildings, etc.)
-      ↓
-Strategy pattern: classifyBuilding(), classifyRoad(), etc.
-      ↓
-Populated ContextDataTile.features object
-```
-
-### Strategy Pattern for Classification
-
-Each feature type has a dedicated classifier function:
-
-```typescript
-// Example: Building classification
-export function classifyBuilding(
-  id: string,
-  tags: Record<string, string>,
-  geometry: ClassifiedGeometry,
-  features: ModuleFeatures
-): void {
-  // Extract visual properties from tags
-  const height = tags.height ? parseFloat(tags.height) : undefined;
-  const buildingType = tags.building || 'other';
-  const color = getColorForBuilding(tags, buildingType);
-
-  // Create BuildingVisual with all rendering properties
-  const building: BuildingVisual = {
-    id,
-    geometry,
-    type: buildingType,
-    height,
-    color,
-    roofShape: tags['roof:shape'],
-    // ... additional properties
-  };
-
-  features.buildings.push(building);
-}
-```
+- **[Canvas Rendering](../visualization/canvas-rendering.md)** - layer ordering, colors, widths, dash patterns, drawing algorithms
+- **[3D Object Visualization](../visualization/objects.md)** - heights, shapes, geometry, materials, roof types
 
 ## Graceful Degradation
 
-The system handles missing data and cache failures:
+The system handles missing data and failures gracefully:
 
 **When cache unavailable:**
 
@@ -339,10 +317,9 @@ The system handles missing data and cache failures:
 - Terrain remains visible with default color
 - User continues exploration unaffected
 
-**When API fails:**
+**When network fails:**
 
-- Exponential backoff retry (100ms, 200ms, 400ms)
-- Rate-limit responses (429) skip retry
+- Exponential backoff retry (100ms, 200ms, 400ms) up to 3 attempts
 - Return null, terrain renders with no overlay
 
 **When geometry missing:**
@@ -355,35 +332,42 @@ The system handles missing data and cache failures:
 
 Context data loads when the drone moves, after elevation updates. For tile ring management, caching, and network concurrency, see:
 
-- **[Tile Ring System](../tile-ring-system.md)** — ring lifecycle, caching, eviction, network concurrency
-- **[Coordinate System](../coordinate-system.md)** — Mercator → Three.js transforms
+- **[Tile Ring System](../tile-ring-system.md)** - ring lifecycle, caching, eviction, network concurrency
+- **[Coordinate System](../coordinate-system.md)** - Mercator -> Three.js transforms
 
 ## Key Files & References
 
 ### Core System
 
-| File                                                 | Purpose                                                                |
-| ---------------------------------------------------- | ---------------------------------------------------------------------- |
-| `src/data/contextual/ContextDataManager.ts`          | Orchestrates tile loading, caching, ring management; emits tile events |
-| `src/data/contextual/ContextDataTileLoader.ts`       | Fetches tiles from Overpass API; handles retry/timeout logic           |
-| `src/data/contextual/ContextDataTileParser.ts`       | Parses OverpassJSON; delegates to strategy functions                   |
-| `src/data/contextual/ContextTilePersistenceCache.ts` | IndexedDB-based tile caching (24-hour TTL)                             |
-| `src/data/contextual/types.ts`                       | TypeScript interfaces for all feature types and data structures        |
+| File                                                   | Purpose                                                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `src/data/contextual/ContextDataManager.ts`            | Orchestrates tile loading, caching, ring management; emits tile events |
+| `src/data/contextual/ContextDataTileLoader.ts`         | Fetches tiles from PMTiles; handles overzoom, retry, persistence      |
+| `src/data/contextual/ContextTilePersistenceCache.ts`   | IndexedDB-based tile caching (24-hour TTL)                            |
+| `src/data/contextual/types.ts`                         | TypeScript interfaces for all feature types and data structures       |
 
-### Feature Classification Strategies
+### PMTiles & Parsing
 
-| File                                                   | Feature Type                                              |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| `src/data/contextual/strategies/buildingStrategy.ts`   | Buildings (residential, commercial, offices, etc.)        |
-| `src/data/contextual/strategies/roadStrategy.ts`       | Roads and paths (highways, residential streets, footways) |
-| `src/data/contextual/strategies/railwayStrategy.ts`    | Railways and trams                                        |
-| `src/data/contextual/strategies/waterStrategy.ts`      | Water bodies and waterways (rivers, lakes, canals)        |
-| `src/data/contextual/strategies/vegetationStrategy.ts` | Forests, scrub, trees, vegetation patches                 |
-| `src/data/contextual/strategies/landuseStrategy.ts`    | Landuse areas (parks, farmland, residential, industrial)  |
-| `src/data/contextual/strategies/aerowayStrategy.ts`    | Aeroways (runways, taxiways, helipads)                    |
-| `src/data/contextual/strategies/structureStrategy.ts`  | Man-made structures (towers, chimneys, poles)             |
-| `src/data/contextual/strategies/barrierStrategy.ts`    | Barriers (walls, hedges, retaining walls)                 |
-| `src/data/contextual/strategies/parserUtils.ts`        | Shared utilities: coordinate conversion, geometry parsing |
+| File                                                   | Purpose                                                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `src/data/contextual/pmtiles/PMTilesReader.ts`         | Multi-archive PMTiles querying, per-archive overzoom                  |
+| `src/data/contextual/pmtiles/OvertureParser.ts`        | Routes MVT layers to classify functions                               |
+| `src/data/contextual/pmtiles/mvtGeometry.ts`           | Converts MVT tile-local coords to Mercator GeoJSON                   |
+| `src/data/contextual/pmtiles/featureBoundsFilter.ts`   | Clips features to sub-tile Mercator bounds                            |
+
+### Feature Classification
+
+| File                                            | Feature Type                              |
+| ----------------------------------------------- | ----------------------------------------- |
+| `src/features/building/overtureClassify.ts`     | Buildings (footprints, heights, roofs)     |
+| `src/features/road/overtureClassify.ts`         | Roads and paths                            |
+| `src/features/railway/overtureClassify.ts`      | Railways and trams                         |
+| `src/features/water/overtureClassify.ts`        | Water bodies and waterways                 |
+| `src/features/vegetation/overtureClassify.ts`   | Forests, scrub, vegetation patches         |
+| `src/features/landuse/overtureClassify.ts`      | Landuse areas (parks, farmland, etc.)      |
+| `src/features/aeroway/overtureClassify.ts`      | Aeroways (runways, taxiways, helipads)     |
+| `src/features/registry.ts`                      | FeatureModuleRegistry (orchestration)      |
+| `src/features/registration.ts`                  | 10 module registrations                    |
 
 ### Visualization Integration
 
@@ -395,20 +379,16 @@ Context data loads when the drone moves, after elevation updates. For tile ring 
 
 ### Configuration
 
-| File            | Lines   | Purpose                                                              |
-| --------------- | ------- | -------------------------------------------------------------------- |
-| `src/config.ts` | 84-99   | contextDataConfig: zoom, ring radius, concurrency, timeout, endpoint |
-| `src/config.ts` | 104-158 | colorPalette, buildingHeightDefaults, material colors, roof colors   |
-| `src/config.ts` | 189-290 | structureDefaults, barrierDefaults, vegetationMeshConfig             |
-| `src/config.ts` | 295-348 | groundColors: landuse and water colors                               |
-| `src/config.ts` | 353-429 | roadSpec, surfaceColors, railwaySpec, waterwayWidthsMeters           |
-
-### Testing
-
-- `src/data/contextual/ContextDataManager.test.ts` - Tile loading, ring management, caching
-- `src/data/contextual/ContextDataTileParser.test.ts` - OSM parsing and feature classification
-- `src/data/contextual/ContextTilePersistenceCache.test.ts` - IndexedDB cache behavior
+| File            | Lines    | Purpose                                                              |
+| --------------- | -------- | -------------------------------------------------------------------- |
+| `src/config.ts` | 92-114   | contextDataConfig: zoom, ring, concurrency, timeout, Overture config |
+| `src/config.ts` | 119-158  | colorPalette, buildingHeightDefaults, material colors, roof colors   |
+| `src/config.ts` | 189-290  | structureDefaults, barrierDefaults, vegetationMeshConfig             |
+| `src/config.ts` | 295-348  | groundColors: landuse and water colors                               |
+| `src/config.ts` | 353-429  | roadSpec, surfaceColors, railwaySpec, waterwayWidthsMeters           |
 
 ## See Also
 
+- **[Overture Maps Schema Reference](../overture/README.md)** - Overture schema details (base, buildings, transportation)
+- **[Data Pipeline Pattern](../data-pipeline.md)** - Five-stage pipeline used across all data systems
 - **[Glossary](../glossary.md)** - Definitions of all technical terms

@@ -47,7 +47,7 @@ A real-time 3D drone simulator that renders the drone's viewpoint as it moves th
   - Listens to ContextDataManager for tile events
   - Creates TileResource<Texture> objects (null when context unavailable)
   - Emits tileAdded (non-null textures only) / tileRemoved events
-- **TerrainCanvasRenderer** (`src/visualization/terrain/texture/TerrainCanvasRenderer.ts`): Renders OSM features to canvas
+- **TerrainCanvasRenderer** (`src/visualization/terrain/texture/TerrainCanvasRenderer.ts`): Renders contextual features to canvas
 - **Receives**: Elevation data and context data
 - **Produces**: 3D mesh objects ready for rendering
 

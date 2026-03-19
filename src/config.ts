@@ -478,7 +478,7 @@ export const waterwayWidthsMeters: Record<string, number> = {
 };
 
 export const textureConfig = {
-  // Ground canvas size in pixels for rendering OSM features (roads, water, landuse, etc.)
+  // Ground canvas size in pixels for rendering contextual features (roads, water, landuse, etc.)
   // Higher values provide more detail but increase canvas rendering time
   groundCanvasSize: 2048,
 };

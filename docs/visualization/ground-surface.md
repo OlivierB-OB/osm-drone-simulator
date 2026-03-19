@@ -5,7 +5,7 @@
 The ground surface rendering system displays realistic terrain by combining two data sources:
 
 1. **Elevation data** → Three.js mesh geometry (3D shape)
-2. **OpenStreetMap (OSM) features** → Canvas texture (visual detail)
+2. **Overture Maps features** → Canvas texture (visual detail)
 
 This two-stage asynchronous pipeline ensures responsive rendering: elevation geometry loads first (basic terrain shape), then texture details appear as canvas rendering completes. Both pipelines work independently and converge in the 3D scene.
 
@@ -25,10 +25,10 @@ flowchart TD
     ContextPipe --> CDM["ContextDataManager"]
 
     EDM --> EDTP["ElevationDataTileParser"]
-    CDM --> CDTP["ContextDataTileParser"]
+    CDM --> CDTL["ContextDataTileLoader"]
 
     EDTP --> TGF["TerrainGeometryFactory<br/>(256×256 vertices)"]
-    CDTP --> TTF["TerrainTextureObjectManager<br/>+ TerrainCanvasRenderer"]
+    CDTL --> TTF["TerrainTextureObjectManager<br/>+ TerrainCanvasRenderer"]
 
     TGF --> Geom["Three.js BufferGeometry"]
     TTF --> Canvas["Canvas<br/>(2048×2048 raster)"]
@@ -48,7 +48,7 @@ across the system, see the Data Pipeline Pattern documentation.
 |----------|-------|---------|
 | **Zoom Level** | 15 (Web Mercator) | Tile resolution (tighter zoom = more detail tiles) |
 | **Tile Size** | 256×256 pixels | Elevation grid dimension |
-| **Canvas Size** | 2048×2048 pixels | OSM feature texture detail (see `TerrainTextureFactory.ts: createTexture() method`) |
+| **Canvas Size** | 2048×2048 pixels | Feature texture detail (see `TerrainTextureFactory.ts: createTexture() method`) |
 | **Ring Radius** | 1-3 (configurable) | Tile loading radius around drone (1=3×3 grid) |
 | **Max Concurrent Loads** | 3 | Network concurrency limit |
 | **Elevation Range** | -430 m to ~9000 m | Dead Sea to Everest |
@@ -60,16 +60,16 @@ The canvas size parameter is defined in `src/config.ts` (lines 465-469):
 
 ```typescript
 export const textureConfig = {
-  // Ground canvas size in pixels for rendering OSM features (roads, water, landuse, etc.)
+  // Ground canvas size in pixels for rendering contextual features (roads, water, landuse, etc.)
   // Higher values provide more detail but increase canvas rendering time
   groundCanvasSize: 2048,
 };
 ```
 
 This configuration is used by:
-- **`TerrainTextureFactory.ts: createTexture() method`** — Creates offscreen canvas with dimensions `groundCanvasSize × groundCanvasSize` for rendering OSM features (lines 46–48)
+- **`TerrainTextureFactory.ts: createTexture() method`** — Creates offscreen canvas with dimensions `groundCanvasSize × groundCanvasSize` for rendering contextual features (lines 46-48)
 
-The **2048×2048 pixel canvas** provides sufficient detail for OSM feature rendering at zoom level 15 while keeping canvas rendering time reasonable. Higher values (e.g., 4096) would provide finer texture detail but increase CPU rendering time; lower values (e.g., 1024) would reduce rendering time but lose detail.
+The **2048×2048 pixel canvas** provides sufficient detail for feature rendering at zoom level 15 while keeping canvas rendering time reasonable. Higher values (e.g., 4096) would provide finer texture detail but increase CPU rendering time; lower values (e.g., 1024) would reduce rendering time but lose detail.
 
 ---
 
@@ -94,14 +94,14 @@ flowchart TD
 
 ### 2. Texture Pipeline
 
-Renders OSM features onto a canvas texture. See Stage 1 (Manager), Stage 2 (Parser), and Stage 3 (Factory) in [`doc/data-pipeline.md`](../data-pipeline.md).
+Renders contextual features onto a canvas texture. See Stage 1 (Manager), Stage 2 (Parser), and Stage 3 (Factory) in [`doc/data-pipeline.md`](../data-pipeline.md).
 
 ```mermaid
 flowchart TD
-    OSM["OpenStreetMap Features<br/>(roads, water, landuse, etc.)"]
-    OSM --> CDM["ContextDataManager<br/>(caching,<br/>ring-based loading)"]
-    CDM --> CDTP["ContextDataTileParser<br/>(feature extraction)"]
-    CDTP --> TCR["TerrainCanvasRenderer<br/>(painter's algorithm,<br/>feature drawing)"]
+    OV["Overture Maps Features<br/>(roads, water, landuse, etc.)"]
+    OV --> CDM["ContextDataManager<br/>(caching,<br/>ring-based loading)"]
+    CDM --> CDTL["ContextDataTileLoader<br/>(PMTiles + OvertureParser)"]
+    CDTL --> TCR["TerrainCanvasRenderer<br/>(painter's algorithm,<br/>feature drawing)"]
     TCR --> Canvas["Canvas Texture<br/>(2048×2048,<br/>applied to<br/>geometry UVs)"]
 ```
 
@@ -185,11 +185,11 @@ Normals are **computed automatically** from the triangle mesh using Three.js's `
 
 ---
 
-## Texture Rendering (OSM Features)
+## Texture Rendering (Contextual Features)
 
 ### Purpose
 
-While elevation geometry provides the 3D shape, OSM feature textures add visual detail: roads, water bodies, landuse areas, vegetation, railways, etc. Instead of drawing these as individual meshes (which would create millions of geometry objects), they're **rasterized to a 2048×2048 canvas texture** for efficient rendering.
+While elevation geometry provides the 3D shape, contextual feature textures add visual detail: roads, water bodies, landuse areas, vegetation, railways, etc. Instead of drawing these as individual meshes (which would create millions of geometry objects), they're **rasterized to a 2048×2048 canvas texture** for efficient rendering.
 
 **See [`doc/visualization/canvas-rendering.md`](./canvas-rendering.md) for comprehensive documentation of:**
 - Canvas rendering pipeline and architecture
@@ -299,7 +299,7 @@ The system degrades gracefully if data is unavailable:
 
 ### Why Canvas Textures
 
-OSM features include millions of line segments (roads, railways, waterways). Rendering each as individual Three.js geometry would create millions of mesh objects, causing:
+Contextual features include millions of line segments (roads, railways, waterways). Rendering each as individual Three.js geometry would create millions of mesh objects, causing:
 - Excessive draw calls
 - Memory overhead (vertices + indices per feature)
 - GPU bottleneck
@@ -347,7 +347,7 @@ Ground meshes use Three.js **MeshPhongMaterial**:
 
 ```javascript
 new THREE.MeshPhongMaterial({
-  map: canvasTexture,      // OSM feature texture
+  map: canvasTexture,      // Feature texture
   shininess: 10,           // Low shininess (matte terrain)
   side: THREE.FrontSide,   // Only front faces visible
 })
@@ -392,10 +392,10 @@ Useful for:
 | `TerrainGeometryObjectManager.ts` | Geometry coordination | Listen to elevation tiles, create geometry objects, emit events |
 | `TerrainTextureObjectManager.ts` | Texture coordination | Listen to context tiles, create texture objects, emit events |
 | `TerrainGeometryFactory.ts` | Geometry creation | Convert elevation data → vertex buffer + normals |
-| `TerrainCanvasRenderer.ts` | Texture rendering | Draw OSM features → canvas texture (painter's algorithm) |
+| `TerrainCanvasRenderer.ts` | Texture rendering | Draw features → canvas texture (painter's algorithm) |
 | `TerrainObjectFactory.ts` | Mesh integration | Create Three.js mesh (geometry + texture), position at tile center |
 | `ElevationDataManager.ts` | Tile caching | Fetch/cache elevation tiles, manage ring-based loading |
-| `ContextDataManager.ts` | OSM feature caching | Fetch/cache OSM tiles, manage feature extraction |
+| `ContextDataManager.ts` | Feature caching | Fetch/cache Overture tiles, manage feature extraction |
 
 ### Configuration
 

@@ -185,7 +185,7 @@ src/
 ├── gis/               # Geographic coordinate system
 ├── data/
 │   ├── elevation/     # Elevation tile data (AWS Terrain)
-│   └── contextual/    # OSM context data (Overpass API)
+│   └── contextual/    # Overture Maps context data (PMTiles)
 ├── visualization/
 │   ├── terrain/       # Terrain geometry and texturing
 │   ├── mesh/          # 3D mesh factories (buildings, vegetation, etc.)
@@ -206,7 +206,7 @@ src/
 - `cameraConfig` - positioning
 - `sceneConfig` - lighting and fog
 - `elevationConfig` - tile management
-- `contextDataConfig` - OSM data fetching
+- `contextDataConfig` - Overture Maps data fetching
 - Visual configuration: `colorPalette`, `buildingHeightDefaults`, etc.
 - `debugConfig` - debug visualization
 

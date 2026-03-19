@@ -1,12 +1,12 @@
-# Canvas Rendering: OSM Feature Rasterization
+# Canvas Rendering: Feature Rasterization
 
 ## Overview
 
-The drone simulator visualizes millions of OpenStreetMap (OSM) features—roads, water bodies, vegetation, landuse areas, railways, and aeroways—by **rasterizing them to a 2D canvas texture**. This approach provides rich visual detail while maintaining performance.
+The drone simulator visualizes millions of contextual features—roads, water bodies, vegetation, landuse areas, railways, and aeroways—by **rasterizing them to a 2D canvas texture**. This approach provides rich visual detail while maintaining performance.
 
 ### Why Canvas Textures?
 
-Rendering each OSM feature as an individual 3D mesh would create **millions of geometry objects**, causing:
+Rendering each feature as an individual 3D mesh would create **millions of geometry objects**, causing:
 
 - Excessive draw calls (GPU bottleneck)
 - Memory overhead (vertices + indices per feature)
@@ -21,7 +21,7 @@ Instead, features are **rasterized to a 2048×2048 canvas** per tile, then appli
 ### Architecture at a Glance
 
 ```
-OSM Context Tile (features)
+Context Tile (features)
        ↓
 TerrainCanvasRenderer (painter's algorithm)
        ↓
@@ -42,7 +42,7 @@ Visible in 3D scene
 
 | Component                    | Responsibility                                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------------------------- |
-| **ContextDataTile**          | Data structure holding parsed OSM features for a tile (buildings, roads, water, vegetation, etc.) |
+| **ContextDataTile**          | Data structure holding parsed Overture features for a tile (buildings, roads, water, vegetation, etc.) |
 | **TerrainCanvasRenderer**    | Main rendering engine; draws features to canvas in painter's algorithm order                      |
 | **MercatorBounds**           | Spatial bounds object: `{minX, maxX, minY, maxY}` defining tile extents in Mercator coordinates   |
 | **CanvasRenderingContext2D** | Standard HTML5 canvas 2D drawing API                                                              |
@@ -52,7 +52,7 @@ Visible in 3D scene
 
 ```
 ┌─────────────────────────────────────────┐
-│   OSM Contextual Data Tile              │
+│   Contextual Data Tile                  │
 │  (buildings, roads, water, vegetation)  │
 └────────────────┬────────────────────────┘
                  │
@@ -287,7 +287,7 @@ const sorted = [...tile.features.roads].sort(
 
 ### Input: Mercator Coordinates (Geographic)
 
-OSM features arrive with coordinates in **Mercator projection**:
+Features arrive with coordinates in **Mercator projection**:
 
 - **X:** Increases eastward (longitude)
 - **Y:** Increases northward (latitude)
@@ -445,16 +445,16 @@ ctx.fill();
 
 ### All Supported Features
 
-| Feature Type     | OSM Key           | Example Sub-Types                                                      | Canvas Drawing Method    | Color Config                           | Width/Dash                                                |
-| ---------------- | ----------------- | ---------------------------------------------------------------------- | ------------------------ | -------------------------------------- | --------------------------------------------------------- |
-| **Landuse**      | `landuse`         | grassland, farmland, residential, commercial, industrial, park, forest | Polygon                  | `groundColors.landuse.*`               | N/A                                                       |
-| **Water bodies** | `natural=water`   | lake, pond, reservoir                                                  | Polygon                  | `groundColors.water.body` (#3a6ab0)    | N/A                                                       |
-| **Waterways**    | `waterway`        | river, canal, stream                                                   | LineString               | `groundColors.water.line` (#3a6ab0)    | From `waterwayWidthsMeters`                               |
-| **Wetlands**     | `natural=wetland` | marsh, bog, swamp                                                      | Polygon                  | `groundColors.water.wetland` (#5a9a6a) | N/A                                                       |
-| **Vegetation**   | `natural`         | wood, forest, scrub, heath, fell, tundra                               | Polygon/LineString/Point | `groundColors.vegetation.*` (#3a7a30)  | 0.5px (line) or 2px (point)                               |
-| **Aeroways**     | `aeroway`         | aerodrome, runway, taxiway, apron, helipad                             | Polygon/LineString/Point | `groundColors.aeroways.*`              | From feature or 45m/4px                                   |
-| **Roads**        | `highway`         | motorway, primary, residential, footway, track, path                   | LineString               | `roadSpec.*.color` + `surfaceColors`   | From `roadSpec.*.widthMeters` + special `[2,2]` for steps |
-| **Railways**     | `railway`         | rail, light_rail, tram, metro, monorail, disused                       | LineString               | `railwaySpec.*.color` (#888888)        | From `railwaySpec.*.widthMeters` + `dash` pattern         |
+| Feature Type     | Overture Source        | Example Sub-Types                                                      | Canvas Drawing Method    | Color Config                           | Width/Dash                                                |
+| ---------------- | ---------------------- | ---------------------------------------------------------------------- | ------------------------ | -------------------------------------- | --------------------------------------------------------- |
+| **Landuse**      | `land_use`, `land`     | grassland, farmland, residential, commercial, industrial, park, forest | Polygon                  | `groundColors.landuse.*`               | N/A                                                       |
+| **Water bodies** | `water`                | lake, pond, reservoir                                                  | Polygon                  | `groundColors.water.body` (#3a6ab0)    | N/A                                                       |
+| **Waterways**    | `water`                | river, canal, stream                                                   | LineString               | `groundColors.water.line` (#3a6ab0)    | From `waterwayWidthsMeters`                               |
+| **Wetlands**     | `water`                | marsh, bog, swamp                                                      | Polygon                  | `groundColors.water.wetland` (#5a9a6a) | N/A                                                       |
+| **Vegetation**   | `land`, `land_cover`   | wood, forest, scrub, heath, fell, tundra                               | Polygon/LineString/Point | `groundColors.vegetation.*` (#3a7a30)  | 0.5px (line) or 2px (point)                               |
+| **Aeroways**     | `infrastructure`       | aerodrome, runway, taxiway, apron, helipad                             | Polygon/LineString/Point | `groundColors.aeroways.*`              | From feature or 45m/4px                                   |
+| **Roads**        | `segment` (non-rail)   | motorway, primary, residential, footway, track, path                   | LineString               | `roadSpec.*.color` + `surfaceColors`   | From `roadSpec.*.widthMeters` + special `[2,2]` for steps |
+| **Railways**     | `segment` (rail class) | rail, light_rail, tram, metro, monorail, disused                       | LineString               | `railwaySpec.*.color` (#888888)        | From `railwaySpec.*.widthMeters` + `dash` pattern         |
 
 ### Color Values (from `src/config.ts`)
 
@@ -600,7 +600,7 @@ Typical visible tiles: 3×3 grid = ~288 MB maximum
 Contextual tiles load with concurrency control:
 
 ```typescript
-maxConcurrentLoads: 3; // Max 3 simultaneous tile fetches
+maxConcurrentLoads: 6; // Max 6 simultaneous PMTiles requests
 ```
 
 Canvas rendering is **synchronous** but fast (typically <100ms per 2048×2048 canvas).
@@ -620,13 +620,13 @@ Island hole:   Ring boundary crossed 1 time → Not filled (correct)
 Lake water:    Ring boundary crossed 0 times → Filled (correct)
 ```
 
-**Limitation:** Self-intersecting boundaries may not render correctly with all canvas implementations. In practice, OSM data is clean enough that this is rarely an issue.
+**Limitation:** Self-intersecting boundaries may not render correctly with all canvas implementations. In practice, Overture data is clean enough that this is rarely an issue.
 
 ### Self-Intersecting Boundaries
 
 **Challenge:** Malformed polygons with self-crossing edges
 
-**Behavior:** Canvas API handles automatically; visual artifact depends on fill rule. OSM validation is strict, so this is extremely rare.
+**Behavior:** Canvas API handles automatically; visual artifact depends on fill rule. Overture data validation is strict, so this is extremely rare.
 
 ### Tile Boundary Features
 
@@ -666,7 +666,7 @@ This ensures **pixel-perfect alignment** at tile boundaries.
 
 ### Tree & Tree Row Exclusion
 
-**Important:** `tree` and `tree_row` OSM features are **excluded from canvas**:
+**Important:** `tree` and `tree_row` features are **excluded from canvas**:
 
 ```typescript
 if (veg.type === 'tree' || veg.type === 'tree_row') continue; // Line 188
@@ -777,7 +777,7 @@ Canvas rendering happens via `TerrainTextureObjectManager` listening to context 
 
 ### Related Documentation
 
-For OSM feature specifications, data fetching, and tag extraction strategies, see **[Contextual Data System](../data/contextual.md)**. This document covers the data interpretation side; canvas-rendering.md handles the visualization rendering.
+For Overture feature specifications, data fetching, and classification pipeline, see **[Contextual Data System](../data/contextual.md)**. This document covers the data interpretation side; canvas-rendering.md handles the visualization rendering.
 
 ### Testing
 

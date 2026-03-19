@@ -14,4 +14,4 @@ Organized by task/question. Start here to find the right doc.
 | Glossary | [glossary.md](glossary.md) | Definitions for all technical terms |
 | **Elevation data** | [data/README.md](data/README.md) | Terrain height fetching, decoding, sampling |
 | **Visualization** | [visualization/README.md](visualization/README.md) | Ground surface, canvas textures, 3D objects |
-| **OSM reference** | [osm/README.md](osm/README.md) | OSM tagging reference for features and keys |
+| **Overture Maps** | [overture/README.md](overture/README.md) | Overture schema reference (base, buildings, transportation) |

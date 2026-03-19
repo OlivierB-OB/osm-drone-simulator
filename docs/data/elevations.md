@@ -335,7 +335,7 @@ tileRemoved: { key: "15/16383/10904" }
 
 Elevation data is used to create the visible terrain mesh in the 3D scene. For detailed information on how elevation tiles are converted to Three.js geometry, normals, and textures, see **[Ground Surface Rendering](../visualization/ground-surface.md#elevation-data-to-geometry)**.
 
-Briefly: TerrainGeometryFactory reads the elevation grid, creates 256×256 vertices with proper coordinate transformation, computes normals for lighting, and generates triangle indices. The resulting mesh combines with OSM feature textures to form the final terrain surface (approximately 131,000 vertices per tile).
+Briefly: TerrainGeometryFactory reads the elevation grid, creates 256×256 vertices with proper coordinate transformation, computes normals for lighting, and generates triangle indices. The resulting mesh combines with contextual feature textures to form the final terrain surface (approximately 131,000 vertices per tile).
 
 ### Animation Frame Integration
 

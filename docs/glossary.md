@@ -4,17 +4,17 @@ Central reference for all technical terms used throughout the drone simulator do
 
 ## Terms (A-Z)
 
-**Aeroway** - OSM feature for airport infrastructure (runways, taxiways, helipads).
+**Aeroway** - Feature for airport infrastructure (runways, taxiways, helipads).
 
 **Azimuth** - Compass bearing in degrees (0°=North, clockwise positive). Used to define drone heading and camera orientation.
 
 **Bilinear Interpolation** - Smoothing technique using 4 nearest pixel values to compute intermediate elevation. Provides sub-meter precision when sampling elevations between tile pixels.
 
-**Bounding Box (bbox)** - Rectangle defined by min/max latitude and longitude; used to scope Overpass queries to tile area.
+**Bounding Box (bbox)** - Rectangle defined by min/max latitude and longitude; used to scope tile queries to geographic area.
 
-**Canvas Rendering Context2D** - HTML5 2D drawing API providing methods like `fillRect()`, `stroke()`, `fill()`, `arc()`, etc. Used to draw OSM features on canvas textures.
+**Canvas Rendering Context2D** - HTML5 2D drawing API providing methods like `fillRect()`, `stroke()`, `fill()`, `arc()`, etc. Used to draw contextual features on canvas textures.
 
-**Canvas Texture** - HTML5 Canvas rendered to an image, then converted to a WebGL texture. OSM features (roads, buildings, water) are rasterized to canvas, then mapped onto terrain meshes.
+**Canvas Texture** - HTML5 Canvas rendered to an image, then converted to a WebGL texture. Contextual features (roads, buildings, water) are rasterized to canvas, then mapped onto terrain meshes.
 
 **Center Tile** - Tile containing drone's current position. Starting point for concentric ring expansion.
 
@@ -24,7 +24,7 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **Concurrent Loads** - Maximum simultaneous network requests for data tiles (e.g., elevation or context tiles). Limited to reduce bandwidth/server load.
 
-**Context Data Tile** - Parsed OSM data for a single tile: buildings, roads, water, vegetation, landuse, aeroways, structures, barriers. One tile at zoom 15 covers ~327 m × 327 m.
+**Context Data Tile** - Parsed Overture Maps data for a single tile: buildings, roads, water, vegetation, landuse, aeroways, structures, barriers. One tile at zoom 15 covers ~327 m x 327 m.
 
 **Coordinate Transformation** - Mapping geographic Mercator coordinates to Three.js world coordinates, or vice versa. Critical for alignment of drone, camera, terrain, and objects.
 
@@ -34,7 +34,7 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **ExtrudeGeometry** - Three.js geometry that extrudes a 2D shape along the Z axis. Used for buildings and roofs.
 
-**Feature Classification** - Process of examining OSM tags and determining which visual type (BuildingVisual, RoadVisual, etc.) to create.
+**Feature Classification** - Process of examining Overture feature properties and determining which visual type (BuildingVisual, RoadVisual, etc.) to create.
 
 **Graceful Degradation** - System remains functional when cache/network fails. Terrain renders without feature overlays if context tiles unavailable.
 
@@ -44,7 +44,7 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **Instanced Mesh** - Three.js optimization drawing single geometry multiple times with different transforms. Reduces draw calls and memory for repeated objects (trees, poles).
 
-**Landuse** - OSM classification of ground area (farmland, park, residential, industrial, forest, etc.). Combined with natural/water tags to categorize terrain features.
+**Landuse** - Classification of ground area (farmland, park, residential, industrial, forest, etc.). Combined with land/water types to categorize terrain features.
 
 **LineCap** - How line endpoints render: 'round', 'butt', or 'square'. Affects road and railway appearance at endpoints.
 
@@ -58,23 +58,21 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **Mercator Bounds** - Rectangular region in Web Mercator projection: `{minX, maxX, minY, maxY}` in meters. Defines tile geographic extent.
 
-**Mercator Projection** - Web mapping standard used by OSM, Google Maps, etc. (EPSG:3857). Maps latitude/longitude to rectangular coordinates. Maintains angles but distorts area near poles.
+**Mercator Projection** - Web mapping standard (EPSG:3857). Maps latitude/longitude to rectangular coordinates. Maintains angles but distorts area near poles.
 
 **MeshPhongMaterial** - Three.js material supporting Phong reflection model (combines ambient, diffuse, specular lighting). Used for realistic shading of terrain and objects.
 
 **Mipmapping** - Pre-computed texture pyramies for efficient filtering at different scales/distances. Applied automatically by Three.js for better performance.
 
-**Natural** - OSM tag for natural features (forests, water, grassland). Combined with landuse tags to categorize terrain.
-
-**OpenStreetMap (OSM)** - Collaborative global map database. Features include roads, buildings, water, vegetation, railways, etc. Source for contextual features in simulator.
+**MVT (Mapbox Vector Tiles)** - Binary format for encoding vector tile data. Used by PMTiles archives to store Overture Maps features. Decoded via `@mapbox/vector-tile` + `pbf`.
 
 **Oriented Bounding Box (OBB)** - Minimal rectangle aligned with polygon axes rather than axis-aligned. Used for accurate bounds in building placement.
 
-**Overpass API** - Free, open-source query service for OpenStreetMap data. Returns OverpassJSON format with nodes, ways, relations, and tags.
+**Overture Maps Foundation** - Open map data provider with a structured, versioned schema. Source for contextual features (buildings, roads, water, etc.) in the simulator.
 
-**OverpassJSON** - JSON format for Overpass API responses. Contains nodes, ways, relations with tags and geometry coordinates.
+**Overzoom** - Technique for requesting tile data at a zoom level exceeding the archive's maxZoom. The parent tile is fetched and features are filtered to the requested sub-tile bounds.
 
-**OverpassQL** - Query language for Overpass API. Supports complex spatial and tag-based queries.
+**PMTiles** - Single-file tile archive format supporting HTTP range requests. Each Overture theme (buildings, transportation, base) is stored as one PMTiles file.
 
 **Painter's Algorithm** - Drawing technique rendering back-to-front (furthest to nearest) to achieve correct layering without explicit Z-buffering. Used for canvas feature layering.
 
@@ -94,7 +92,7 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **Sub-Meter Precision** - Blue channel in Terrarium format enables ~4 mm elevation accuracy (B/256 meter subdivision).
 
-**Tag** - OSM key-value pair describing feature properties. Examples: `building=residential`, `height=10`, `highway=primary`.
+**Tag** - Key-value pair describing feature properties. In OSM: `building=residential`, `height=10`. In Overture: typed fields like `class`, `subtype`.
 
 **Tapered Cylinder** - Cylinder with different top and bottom radii. Used for chimneys and similar building features.
 
@@ -116,7 +114,7 @@ Central reference for all technical terms used throughout the drone simulator do
 
 **Vertex Normal** - Direction perpendicular to mesh surface, computed per-vertex. Essential for realistic lighting calculations.
 
-**Way** - OSM feature representing linestring or polygon (roads, buildings, water, etc.).
+**Way** - OSM primitive representing linestring or polygon (roads, buildings, water, etc.). Overture uses GeoJSON geometry types instead.
 
 **Web Mercator** - Standard cylindrical map projection for web maps (EPSG:3857). X increases eastward, Y increases northward. Formula: longitude → X directly, latitude → Y nonlinearly.
 
