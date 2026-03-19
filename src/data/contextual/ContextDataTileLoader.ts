@@ -5,7 +5,9 @@ import { ContextTilePersistenceCache } from './ContextTilePersistenceCache';
 import { getTileMercatorBounds } from '../../gis/webMercator';
 import { loadWithPersistenceCache } from '../shared/tileLoaderUtils';
 import { OvertureParser } from './pmtiles/OvertureParser';
-import type { PMTilesReader } from './pmtiles/PMTilesReader';
+import type { PMTilesReader, ArchiveGroup } from './pmtiles/PMTilesReader';
+import type { ModulesFeatures } from '../../features/registrationTypes';
+import type { MercatorBounds } from '../../gis/types';
 import { filterFeaturesByBounds } from './pmtiles/featureBoundsFilter';
 import { featureRegistry } from '../../features/registry';
 
@@ -48,13 +50,30 @@ export class ContextDataTileLoader {
     return this.loadTileWithOverzoom(coordinates, reader, effectiveZ);
   }
 
+  private static parseAndMergeGroups(
+    groups: ArchiveGroup[],
+    clampBounds: MercatorBounds
+  ): ModulesFeatures {
+    const merged = featureRegistry.modulesFeaturesFactory();
+    for (const { tile, fetchCoords } of groups) {
+      const bounds = getTileMercatorBounds(fetchCoords);
+      const parsed = OvertureParser.parse(tile, bounds, fetchCoords);
+      for (const key of Object.keys(parsed) as (keyof ModulesFeatures)[]) {
+        const src = parsed[key] as unknown[];
+        const dst = merged[key] as unknown[];
+        dst.push(...src);
+      }
+    }
+    return filterFeaturesByBounds(merged, clampBounds);
+  }
+
   private static async loadTileDirect(
     coordinates: TileCoordinates,
     reader: PMTilesReader
   ): Promise<ContextDataTile> {
     const bounds = getTileMercatorBounds(coordinates);
-    const { tile: layers } = await reader.getTile(coordinates);
-    const features = OvertureParser.parse(layers, bounds, coordinates);
+    const { groups } = await reader.getTile(coordinates);
+    const features = this.parseAndMergeGroups(groups, bounds);
     return {
       coordinates,
       mercatorBounds: bounds,
@@ -108,12 +127,8 @@ export class ContextDataTileLoader {
     reader: PMTilesReader
   ): Promise<ContextDataTile[]> {
     const parentBounds = getTileMercatorBounds(parentCoords);
-    const { tile: layers } = await reader.getTile(parentCoords);
-    const allFeatures = OvertureParser.parse(
-      layers,
-      parentBounds,
-      parentCoords
-    );
+    const { groups } = await reader.getTile(parentCoords);
+    const allFeatures = this.parseAndMergeGroups(groups, parentBounds);
 
     const dz = targetZ - parentCoords.z;
     const subCount = 1 << dz;

@@ -6,9 +6,14 @@ import type { TileCoordinates } from '../../elevation/types';
 
 export type DecodedTile = Map<string, VectorTileLayer>;
 
-export interface OverzoomTileResult {
+export interface ArchiveGroup {
   tile: DecodedTile;
-  /** Actual coords fetched — parent coords if overzoom was applied, else same as requested */
+  fetchCoords: TileCoordinates;
+}
+
+export interface OverzoomTileResult {
+  groups: ArchiveGroup[];
+  /** Highest-resolution coordinates — same as requested (= max archive zoom is the ceiling) */
   effectiveCoords: TileCoordinates;
 }
 
@@ -49,8 +54,10 @@ export class PMTilesReader {
   }
 
   /**
-   * Returns the minimum maxZoom across all PMTiles archives.
-   * This is the highest zoom level at which data is guaranteed to exist for all themes.
+   * Returns the maximum maxZoom across all PMTiles archives.
+   * This is the highest zoom level at which any theme has data, allowing per-archive
+   * overzoom so that high-resolution archives (e.g. buildings at Z:14) are not
+   * downgraded to match lower-resolution ones (e.g. transportation at Z:13).
    * Result is cached after the first resolution.
    */
   async getEffectiveDataZoom(): Promise<number> {
@@ -60,41 +67,53 @@ export class PMTilesReader {
         Array.from(this.archives.values()).map((a) =>
           a.getHeader().then((h) => h.maxZoom)
         )
-      ).then((zooms) => (this.effectiveDataZoom = Math.min(...zooms)));
+      ).then((zooms) => (this.effectiveDataZoom = Math.max(...zooms)));
     }
     return this.maxZoomReady;
   }
 
   async getTile(coordinates: TileCoordinates): Promise<OverzoomTileResult> {
-    const effectiveZ = await this.getEffectiveDataZoom();
-    const dz = coordinates.z - effectiveZ;
-
-    const effectiveCoords: TileCoordinates =
-      dz > 0
-        ? { z: effectiveZ, x: coordinates.x >> dz, y: coordinates.y >> dz }
-        : coordinates;
-
-    const results = await Promise.all(
-      Array.from(this.archives.entries()).map(async ([, archive]) => {
+    const archiveResults = await Promise.all(
+      Array.from(this.archives.values()).map(async (archive) => {
+        const { maxZoom } = await archive.getHeader();
+        const dz = Math.max(0, coordinates.z - maxZoom);
+        const fetchCoords: TileCoordinates =
+          dz > 0
+            ? { z: maxZoom, x: coordinates.x >> dz, y: coordinates.y >> dz }
+            : coordinates;
         const result = await archive.getZxy(
-          effectiveCoords.z,
-          effectiveCoords.x,
-          effectiveCoords.y
+          fetchCoords.z,
+          fetchCoords.x,
+          fetchCoords.y
         );
         if (!result || !result.data) return null;
-        const pbf = new Pbf(new Uint8Array(result.data));
-        return new VectorTile(pbf);
+        return {
+          vt: new VectorTile(new Pbf(new Uint8Array(result.data))),
+          fetchCoords,
+        };
       })
     );
 
-    const tile: DecodedTile = new Map();
-    for (const vt of results) {
-      if (!vt) continue;
-      for (const layerName of Object.keys(vt.layers)) {
-        tile.set(layerName, vt.layers[layerName]!);
+    // Group layers by fetch coords — archives at the same zoom share one group
+    const groupMap = new Map<
+      string,
+      { tile: DecodedTile; fetchCoords: TileCoordinates }
+    >();
+    for (const r of archiveResults) {
+      if (!r) continue;
+      const key = `${r.fetchCoords.z}:${r.fetchCoords.x}:${r.fetchCoords.y}`;
+      if (!groupMap.has(key))
+        groupMap.set(key, { tile: new Map(), fetchCoords: r.fetchCoords });
+      const group = groupMap.get(key)!;
+      for (const layerName of Object.keys(r.vt.layers)) {
+        group.tile.set(layerName, r.vt.layers[layerName]!);
       }
     }
-    return { tile, effectiveCoords };
+
+    return {
+      groups: Array.from(groupMap.values()),
+      effectiveCoords: coordinates,
+    };
   }
 
   dispose(): void {
