@@ -89,6 +89,21 @@ describe('OvertureParser', () => {
     expect(features.roads).toHaveLength(0);
   });
 
+  it('ignores segment layer entries with subtype water', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'segment',
+        mockLayer([
+          mockFeature(2, [LINE], { class: 'secondary', subtype: 'water' }),
+        ]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.roads).toHaveLength(0);
+    expect(features.railways).toHaveLength(0);
+  });
+
   it('routes land_use layer to landuse array', () => {
     const layers: DecodedTile = new Map([
       [

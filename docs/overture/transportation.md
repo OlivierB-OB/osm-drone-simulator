@@ -102,6 +102,8 @@ Applies when `subtype` is `"rail"`.
 
 Applies when `subtype` is `"water"`. Water segments carry no subtype-specific fields; only the [Core Properties](#core-properties) apply.
 
+> **Note:** Water segments are skipped during parsing (`OvertureParser.ts`). Water bodies are already rendered via the base land/water layer, so processing them as transport features would cause misclassification artifacts.
+
 ---
 
 ## Enumeration Reference

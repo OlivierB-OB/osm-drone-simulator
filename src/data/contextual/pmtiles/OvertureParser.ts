@@ -119,6 +119,8 @@ export class OvertureParser {
       const id = String(props.id ?? `segment-${i}`);
       const segClass = (props.class as string) ?? '';
 
+      if (props.subtype === 'water') continue;
+
       if (props.subtype === 'rail' || RAIL_CLASSES.has(segClass)) {
         features.railways.push(
           classifyOvertureRailway(id, props, geometry as LineString)
