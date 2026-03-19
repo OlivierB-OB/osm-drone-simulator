@@ -14,6 +14,7 @@ export function drawRoads(
   ctx.lineJoin = 'round';
 
   for (const road of sorted) {
+    if (road.tunnel) continue;
     ctx.setLineDash(road.type === 'steps' ? [2, 2] : []);
     ctx.strokeStyle = road.surfaceColor ?? road.color;
     ctx.lineWidth = road.widthMeters * scaleX;

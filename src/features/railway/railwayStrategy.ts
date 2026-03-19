@@ -18,11 +18,6 @@ function getRailwaySpecForType(type: string): {
   );
 }
 
-function getTrackCount(gauge?: string): number {
-  if (!gauge) return 1;
-  return 1;
-}
-
 export function classifyRailway(
   id: string,
   tags: Record<string, string>,
@@ -34,7 +29,6 @@ export function classifyRailway(
     id,
     geometry,
     type: railwayType,
-    trackCount: getTrackCount(tags.gauge),
     widthMeters: spec.widthMeters,
     dash: spec.dash,
     color: spec.color,

@@ -8,7 +8,6 @@ export interface RailwayVisual {
   id: string;
   geometry: LineString;
   type: string; // Railway category: rail, light_rail, tram, metro, etc.
-  trackCount?: number; // Number of tracks/rails
   widthMeters: number; // Real-world width in meters derived from railway type
   dash: number[]; // Line dash pattern [dashLen, gapLen]
   color: HexColor; // Derived from railway type

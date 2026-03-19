@@ -38,7 +38,6 @@ export function classifyRoad(
     laneCount: tags.lanes ? parseInt(tags.lanes, 10) : undefined,
     color: getColorForRoad(highwayType),
     surfaceColor: getRoadSurfaceColor(tags.surface),
-    treeLined: tags.tree_lined as RoadVisual['treeLined'],
     bridge: tags.bridge === 'yes' ? true : undefined,
     layer: tags.layer ? parseInt(tags.layer, 10) : undefined,
   };

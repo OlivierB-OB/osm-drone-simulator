@@ -1,13 +1,21 @@
 import type { BuildingVisual } from './types';
 import type { LineString, Point, Polygon } from 'geojson';
-import { colorPalette, roofMaterialColors } from '../../config';
+import {
+  colorPalette,
+  roofMaterialColors,
+  buildingMaterialColors,
+} from '../../config';
 import type { HexColor } from '../sharedTypes';
 
 function getColorFromFacade(
   facadeColor?: string,
+  facadeMaterial?: string,
   buildingType?: string
 ): HexColor {
   if (facadeColor) return facadeColor;
+  if (facadeMaterial && buildingMaterialColors[facadeMaterial]) {
+    return buildingMaterialColors[facadeMaterial]!;
+  }
   const colors = colorPalette.buildings as Record<string, HexColor>;
   return (colors[buildingType ?? 'default'] || colors.default) as HexColor;
 }
@@ -44,8 +52,10 @@ export function classifyOvertureBuilding(
     levelCount: numFloors,
     color: getColorFromFacade(
       props.facade_color as string | undefined,
+      props.facade_material as string | undefined,
       buildingClass
     ),
+    hasParts: props.has_parts === true ? true : undefined,
     roofColor: getRoofColorFromProps(
       props.roof_material as string | undefined,
       props.roof_color as string | undefined

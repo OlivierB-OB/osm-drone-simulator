@@ -10,9 +10,17 @@ import { classifyOvertureWater } from '../../../features/water/overtureClassify'
 import { classifyOvertureAeroway } from '../../../features/aeroway/overtureClassify';
 import { classifyOvertureLanduse } from '../../../features/landuse/overtureClassify';
 import { classifyOvertureVegetation } from '../../../features/vegetation/overtureClassify';
+import {
+  classifyOvertureBarrier,
+  BARRIER_CLASSES,
+} from '../../../features/barrier/overtureClassify';
+import {
+  classifyOvertureStructure,
+  STRUCTURE_CLASSES,
+} from '../../../features/structure/overtureClassify';
 import { featureRegistry } from '../../../features/registry';
 import '../../../features/registration';
-import type { LineString, Polygon } from 'geojson';
+import type { LineString, Point, Polygon } from 'geojson';
 
 const RAIL_CLASSES = new Set([
   'rail',
@@ -111,7 +119,7 @@ export class OvertureParser {
       const id = String(props.id ?? `segment-${i}`);
       const segClass = (props.class as string) ?? '';
 
-      if (RAIL_CLASSES.has(segClass)) {
+      if (props.subtype === 'rail' || RAIL_CLASSES.has(segClass)) {
         features.railways.push(
           classifyOvertureRailway(id, props, geometry as LineString)
         );
@@ -199,8 +207,25 @@ export class OvertureParser {
       const id = String(props.id ?? `infra-${i}`);
       const infraClass = (props.class as string) ?? '';
 
-      // Only aeroway-related infrastructure
-      if (
+      if (BARRIER_CLASSES.has(infraClass)) {
+        if (geometry.type === 'LineString') {
+          const barrier = classifyOvertureBarrier(
+            id,
+            props,
+            geometry as LineString
+          );
+          if (barrier) features.barriers.push(barrier);
+        }
+      } else if (STRUCTURE_CLASSES.has(infraClass)) {
+        if (geometry.type === 'Point' || geometry.type === 'Polygon') {
+          const structure = classifyOvertureStructure(
+            id,
+            props,
+            geometry as Point | Polygon
+          );
+          if (structure) features.structures.push(structure);
+        }
+      } else if (
         infraClass === 'aerodrome' ||
         infraClass === 'runway' ||
         infraClass === 'taxiway' ||

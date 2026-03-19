@@ -31,7 +31,7 @@ export function classifyOvertureRoad(
   const highwayType = OVERTURE_TO_HIGHWAY[overtureClass] ?? 'unclassified';
   const spec = roadSpec[highwayType] ?? roadSpec['default']!;
 
-  const surface = props.surface as string | undefined;
+  const surface = (props.road_surface ?? props.surface) as string | undefined;
   const surfaceColor: HexColor | undefined = surface
     ? surfaceColors[surface.toLowerCase()]
     : undefined;
@@ -45,6 +45,7 @@ export function classifyOvertureRoad(
       typeof props.lanes === 'number' ? (props.lanes as number) : undefined,
     color: spec.color,
     surfaceColor,
+    tunnel: props.is_tunnel === true ? true : undefined,
     bridge: props.is_bridge === true ? true : undefined,
     layer:
       typeof props.layer === 'number' ? (props.layer as number) : undefined,

@@ -6,6 +6,8 @@ import { classifyOvertureWater } from '../../features/water/overtureClassify';
 import { classifyOvertureAeroway } from '../../features/aeroway/overtureClassify';
 import { classifyOvertureVegetation } from '../../features/vegetation/overtureClassify';
 import { classifyOvertureLanduse } from '../../features/landuse/overtureClassify';
+import { classifyOvertureBarrier } from '../../features/barrier/overtureClassify';
+import { classifyOvertureStructure } from '../../features/structure/overtureClassify';
 import { polygon, lineString, point } from '@turf/helpers';
 
 describe('Overture classify functions', () => {
@@ -116,7 +118,6 @@ describe('Overture classify functions', () => {
     );
 
     expect(railway.type).toBe('light_rail');
-    expect(railway.trackCount).toBeDefined();
     expect(railway.widthMeters).toBe(3);
     expect(railway.dash).toEqual([4, 3]);
     expect(railway.color).toBeDefined();
@@ -203,5 +204,299 @@ describe('Overture classify functions', () => {
 
     expect(landuse.type).toBe('residential');
     expect(landuse.color).toBeDefined();
+  });
+
+  it('classifies buildings with facade_material color', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const building = classifyOvertureBuilding(
+      'b3',
+      { class: 'residential', facade_material: 'brick' },
+      geom
+    );
+
+    expect(building.color).toBe('#c87060');
+  });
+
+  it('prefers facade_color over facade_material', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const building = classifyOvertureBuilding(
+      'b4',
+      {
+        class: 'residential',
+        facade_color: '#ff0000',
+        facade_material: 'brick',
+      },
+      geom
+    );
+
+    expect(building.color).toBe('#ff0000');
+  });
+
+  it('extracts has_parts from building properties', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const building = classifyOvertureBuilding(
+      'b5',
+      { class: 'commercial', has_parts: true },
+      geom
+    );
+
+    expect(building.hasParts).toBe(true);
+  });
+
+  it('classifies roads with road_surface property', () => {
+    const geom = lineString([
+      [0, 0],
+      [1, 1],
+    ]).geometry;
+
+    const road = classifyOvertureRoad(
+      'r3',
+      { class: 'primary', road_surface: 'asphalt' },
+      geom
+    );
+
+    expect(road.surfaceColor).toBe('#777060');
+  });
+
+  it('extracts is_tunnel for roads', () => {
+    const geom = lineString([
+      [0, 0],
+      [1, 1],
+    ]).geometry;
+
+    const road = classifyOvertureRoad(
+      'r4',
+      { class: 'primary', is_tunnel: true },
+      geom
+    );
+
+    expect(road.tunnel).toBe(true);
+  });
+
+  it('extracts is_intermittent for water', () => {
+    const geom = lineString([
+      [0, 0],
+      [1, 1],
+    ]).geometry;
+
+    const water = classifyOvertureWater(
+      'w3',
+      { class: 'stream', is_intermittent: true },
+      geom
+    );
+
+    expect(water.intermittent).toBe(true);
+  });
+
+  it('classifies barriers from infrastructure classes', () => {
+    const geom = lineString([
+      [0, 0],
+      [1, 1],
+    ]).geometry;
+
+    const barrier = classifyOvertureBarrier('bar1', { class: 'wall' }, geom);
+
+    expect(barrier).not.toBeNull();
+    expect(barrier!.type).toBe('wall');
+    expect(barrier!.width).toBe(0.3);
+    expect(barrier!.color).toBeDefined();
+  });
+
+  it('returns null for unknown barrier classes', () => {
+    const geom = lineString([
+      [0, 0],
+      [1, 1],
+    ]).geometry;
+
+    const barrier = classifyOvertureBarrier('bar2', { class: 'fence' }, geom);
+
+    expect(barrier).toBeNull();
+  });
+
+  it('classifies structures from infrastructure classes', () => {
+    const geom = point([0, 0]).geometry;
+
+    const structure = classifyOvertureStructure(
+      'str1',
+      { class: 'tower' },
+      geom
+    );
+
+    expect(structure).not.toBeNull();
+    expect(structure!.type).toBe('tower');
+    expect(structure!.color).toBeDefined();
+  });
+
+  it('extracts height for structures', () => {
+    const geom = point([0, 0]).geometry;
+
+    const structure = classifyOvertureStructure(
+      'str2',
+      { class: 'chimney', height: 50 },
+      geom
+    );
+
+    expect(structure).not.toBeNull();
+    expect(structure!.height).toBe(50);
+  });
+
+  it('returns null for unknown structure classes', () => {
+    const geom = point([0, 0]).geometry;
+
+    const structure = classifyOvertureStructure(
+      'str3',
+      { class: 'bench' },
+      geom
+    );
+
+    expect(structure).toBeNull();
+  });
+
+  it('extracts 3D attributes from JSON string source_tags', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const veg = classifyOvertureVegetation(
+      'v-st1',
+      {
+        class: 'forest',
+        source_tags: JSON.stringify({
+          leaf_type: 'broadleaved',
+          leaf_cycle: 'deciduous',
+          diameter_crown: '8.5',
+          circumference: '3.2',
+        }),
+      },
+      geom
+    );
+
+    expect(veg.leafType).toBe('broadleaved');
+    expect(veg.leafCycle).toBe('deciduous');
+    expect(veg.crownDiameter).toBe(8.5);
+    expect(veg.trunkCircumference).toBe(3.2);
+  });
+
+  it('extracts 3D attributes from object source_tags', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const veg = classifyOvertureVegetation(
+      'v-st2',
+      {
+        class: 'tree',
+        source_tags: { leaf_type: 'needleleaved', circumference: '2.1' },
+      },
+      geom
+    );
+
+    expect(veg.leafType).toBe('needleleaved');
+    expect(veg.leafCycle).toBeUndefined();
+    expect(veg.crownDiameter).toBeUndefined();
+    expect(veg.trunkCircumference).toBe(2.1);
+  });
+
+  it('handles missing source_tags without crashing', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const veg = classifyOvertureVegetation('v-st3', { class: 'grass' }, geom);
+
+    expect(veg.leafType).toBeUndefined();
+    expect(veg.leafCycle).toBeUndefined();
+    expect(veg.crownDiameter).toBeUndefined();
+    expect(veg.trunkCircumference).toBeUndefined();
+  });
+
+  it('handles invalid JSON string source_tags gracefully', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const veg = classifyOvertureVegetation(
+      'v-st4',
+      { class: 'scrub', source_tags: '{not valid json' },
+      geom
+    );
+
+    expect(veg.leafType).toBeUndefined();
+    expect(veg.crownDiameter).toBeUndefined();
+  });
+
+  it('handles non-numeric diameter_crown gracefully', () => {
+    const geom = polygon([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ]).geometry;
+
+    const veg = classifyOvertureVegetation(
+      'v-st5',
+      {
+        class: 'tree',
+        source_tags: { diameter_crown: 'wide', leaf_type: 'broadleaved' },
+      },
+      geom
+    );
+
+    expect(veg.crownDiameter).toBeUndefined();
+    expect(veg.leafType).toBe('broadleaved');
   });
 });

@@ -7,7 +7,7 @@ import type { BuildingVisual, ModuleFeatures } from './types';
 
 function markBuildingParents(buildings: BuildingVisual[]): void {
   const nonParts = buildings.filter(
-    (b) => !b.isPart && b.geometry.type === 'Polygon'
+    (b) => !b.isPart && !b.hasParts && b.geometry.type === 'Polygon'
   );
   const parts = buildings.filter(
     (b) => b.isPart && b.geometry.type === 'Polygon'

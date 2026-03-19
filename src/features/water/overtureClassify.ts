@@ -37,6 +37,7 @@ export function classifyOvertureWater(
     type: waterClass,
     isArea,
     widthMeters,
+    intermittent: props.is_intermittent === true ? true : undefined,
     color,
   };
 }

@@ -14,7 +14,6 @@ export function classifyOvertureRailway(
     id,
     geometry,
     type: railType,
-    trackCount: 1,
     widthMeters: spec.widthMeters,
     dash: spec.dash,
     color: spec.color,

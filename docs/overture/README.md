@@ -44,15 +44,17 @@ The simulator consumes a subset of the full Overture schema. This document serve
 
 | Theme | Consumed Fields | Classifier |
 |-------|----------------|------------|
-| buildings | `height`, `num_floors`, `roof_shape`, `class`, `subtype` | `classifyOvertureBuilding` |
-| transportation | `class`, `subclass`, `road_surface` | `classifyOvertureRoad`, `classifyOvertureRailway` |
-| base (land_use) | `class`, `subtype` | `classifyOvertureLanduse` |
-| base (land) | `subtype` | `classifyOvertureLanduse`, `classifyOvertureVegetation` |
-| base (land_cover) | `subtype` | `classifyOvertureVegetation` |
-| base (water) | `class`, `subtype` | `classifyOvertureWater` |
-| base (infrastructure) | `class` | `classifyOvertureAeroway` |
+| buildings | `class`, `height`, `num_floors`, `min_height`, `has_parts`, `facade_color`, `facade_material`, `roof_shape`, `roof_color`, `roof_material`, `roof_height`, `roof_direction`, `roof_orientation` | `classifyOvertureBuilding` |
+| transportation | `class`, `subtype`, `road_surface`, `lanes`, `is_bridge`, `is_tunnel`, `layer` | `classifyOvertureRoad`, `classifyOvertureRailway` |
+| base (land_use) | `class` | `classifyOvertureLanduse` |
+| base (land) | `subtype`, `source_tags`¹ | `classifyOvertureLanduse`, `classifyOvertureVegetation` |
+| base (land_cover) | `class`, `source_tags`¹ | `classifyOvertureVegetation` |
+| base (water) | `class`, `is_intermittent` | `classifyOvertureWater` |
+| base (infrastructure) | `class`, `height` | `classifyOvertureAeroway`, `classifyOvertureBarrier`, `classifyOvertureStructure` |
 
-Cross-cutting fields like `id`, `bbox`, and `sources` are available but not directly used for rendering. The `source_tags` field preserves upstream OSM tags if needed for future classification refinements.
+Cross-cutting fields like `id`, `bbox`, and `sources` are available but not directly used for rendering.
+
+¹ `source_tags` is used by `classifyOvertureVegetation` to extract OSM-origin 3D attributes: `leaf_type`, `leaf_cycle`, `diameter_crown`, and `circumference`. These feed the tree mesh strategies (`SingleTreeStrategy`, `ForestStrategy`, `TreeRowStrategy`) for canopy shape, color variation, and trunk/crown sizing.
 
 ## See Also
 

@@ -15,6 +15,30 @@ function getHeightCategory(height?: number): 'tall' | 'medium' | 'short' {
   return 'short';
 }
 
+function parseFiniteFloat(value?: string): number | undefined {
+  if (!value) return undefined;
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function resolveSourceTags(
+  props: Record<string, unknown>
+): Record<string, string> | undefined {
+  const raw = props.source_tags;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null) return parsed;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    return raw as Record<string, string>;
+  }
+  return undefined;
+}
+
 export function classifyOvertureVegetation(
   id: string,
   props: Record<string, unknown>,
@@ -27,6 +51,15 @@ export function classifyOvertureVegetation(
   const isForest = vegClass === 'forest' || vegClass === 'wood';
   const heightCategory = isForest ? 'tall' : getHeightCategory(height);
 
+  const tags = resolveSourceTags(props);
+  const leafType = tags?.leaf_type as
+    | 'broadleaved'
+    | 'needleleaved'
+    | undefined;
+  const leafCycle = tags?.leaf_cycle as 'evergreen' | 'deciduous' | undefined;
+  const crownDiameter = parseFiniteFloat(tags?.diameter_crown);
+  const trunkCircumference = parseFiniteFloat(tags?.circumference);
+
   return {
     id,
     geometry,
@@ -34,5 +67,9 @@ export function classifyOvertureVegetation(
     height,
     heightCategory,
     color: getColorForVegetation(vegClass),
+    leafType,
+    leafCycle,
+    crownDiameter,
+    trunkCircumference,
   };
 }
