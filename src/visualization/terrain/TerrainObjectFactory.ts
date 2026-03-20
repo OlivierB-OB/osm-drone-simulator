@@ -28,8 +28,8 @@ export class TerrainObjectFactory {
    */
   createTerrainObject(
     geometryResource: TileResource<BufferGeometry>,
-    textureResource?: TileResource<THREE.Texture> | null,
-    origin?: GeoCoordinates
+    textureResource: TileResource<THREE.Texture> | null | undefined,
+    origin: GeoCoordinates
   ): TileResource<Mesh> {
     const texture = textureResource?.resource;
     const material =
@@ -47,8 +47,7 @@ export class TerrainObjectFactory {
     const bounds = geometryResource.bounds;
     const centerLat = (bounds.minLat + bounds.maxLat) / 2;
     const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-    const effectiveOrigin = origin ?? { lat: centerLat, lng: centerLng };
-    const pos = geoToLocal(centerLat, centerLng, 0, effectiveOrigin);
+    const pos = geoToLocal(centerLat, centerLng, 0, origin);
     mesh.position.set(pos.x, pos.y, pos.z);
 
     return {

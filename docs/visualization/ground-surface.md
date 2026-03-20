@@ -161,11 +161,10 @@ See `doc/data/elevations.md` for detailed elevation specifications.
 1. **Grid sampling**: 256×256 elevation values → 256×256 vertices
 2. **Coordinate mapping**:
    ```
-   X = centerMercatorX + (column / 256) × tileWidthMeters
-   Y = elevation[row][column]
-   Z = -(centerMercatorY + (row / 256) × tileHeightMeters)
+   X = (column / 256 - 0.5) × tileWidthMeters   // east from tile center
+   Y = elevation[row][column]                     // up
+   Z = (row / 256 - 0.5) × tileHeightMeters      // south from tile center
    ```
-   *Note: Z is negated because Mercator Y increases northward; Three.js camera looks along -Z axis.*
 
 3. **Index generation**: 255×255 grid of square cells = 2 triangles per cell = 390,150 indices
 
@@ -175,7 +174,7 @@ Each vertex includes:
 
 | Attribute | Type | Purpose |
 |-----------|------|---------|
-| **Position** | Vec3 (x, y, z) | 3D location (Mercator + elevation) |
+| **Position** | Vec3 (x, y, z) | 3D location in local tile space (east/up/south from tile center) |
 | **Normal** | Vec3 | Face normal for lighting (computed via `computeVertexNormals()`) |
 | **UV** | Vec2 (u, v) | Texture coordinates for canvas overlay |
 
@@ -240,35 +239,34 @@ For ring patterns, tile fetch sequencing, lifecycle phases, and coordinate detai
 
 ### Mesh Positioning
 
-Each loaded tile is positioned at its **tile center** in Mercator space:
+Each loaded tile is positioned at its **tile center** relative to the drone's current position (the Three.js origin):
 
 ```typescript
-meshPosition.x = tileCenter_mercatorX
-meshPosition.y = 0  // Ground reference; elevation adjusts individual vertices
-meshPosition.z = -tileCenter_mercatorY  // Z-negated (critical for Three.js)
+const pos = geoToLocal(centerLat, centerLng, 0, origin);
+mesh.position.set(pos.x, pos.y, pos.z);
 ```
 
-**Why Z-negated?** See `doc/coordinate-system.md`. Mercator Y increases northward; Three.js camera looks along -Z. Negating Z aligns the two systems.
+Where `origin` = `originManager.getOrigin()` (drone's current lat/lng). Z-negation is internal to `geoToLocal()`, not done manually.
 
 ---
 
-## Coordinate System & Z-Negation
+## Coordinate System & Local Tangent Plane
 
-Terrain meshes are positioned using the standard **Mercator-to-Three.js transformation**:
+Terrain meshes are positioned using `geoToLocal()`, which converts geographic coordinates to Three.js local space relative to the drone's position (the origin):
 
 ```
-position.x = tileCenter.mercatorX
-position.y = 0
-position.z = -tileCenter.mercatorY
+X = (lng - origin.lng) × cos(lat) × EARTH_RADIUS × π/180   // east
+Y = elevation                                                // up
+Z = -(lat - origin.lat) × EARTH_RADIUS × π/180             // south
 ```
 
-The Z negation is critical: Mercator Y increases northward, but Three.js camera looks along -Z. By negating Z, north aligns with the camera's default forward direction.
+The drone is always at `(0, elevation, 0)`. All terrain tile centers are expressed as offsets from the drone in meters.
 
 For complete explanation and rationale, see [Coordinate System & Rendering Strategy](../coordinate-system.md).
 
 All ground surface code uses this formula consistently. Implementation details:
-- `TerrainObjectFactory.ts: createTerrainObject() method` — mesh center positioning (line 52)
-- `TerrainGeometryFactory.ts` — vertex Z calculation
+- `TerrainObjectFactory.ts: createTerrainObject() method` — mesh center positioning via `geoToLocal(centerLat, centerLng, 0, origin)` (line ~51)
+- `TerrainGeometryFactory.ts` — vertex positions in local tile space
 - `TerrainCanvasRenderer.ts` — texture UV mapping
 
 ---
@@ -376,7 +374,7 @@ material.wireframe = true;
 
 Useful for:
 - Visualizing vertex grid (256×256)
-- Debugging mesh positioning (Z-negation)
+- Debugging mesh positioning
 - Performance profiling (polygon count)
 
 ---
@@ -388,12 +386,12 @@ Useful for:
 | File | Purpose | Responsibility |
 |------|---------|-----------------|
 | `TileObjectManager.ts` | Abstract base class | Generic tile-event-driven object manager (subscriptions, disposal, lifecycle) |
-| `TerrainObjectManager.ts` | Main orchestrator | Subscribe to geometry/texture managers, coordinate mesh creation, manage lifecycle |
+| `TerrainObjectManager.ts` | Main orchestrator | Subscribe to geometry/texture managers, obtain drone origin from OriginManager, coordinate mesh creation, manage lifecycle |
 | `TerrainGeometryObjectManager.ts` | Geometry coordination | Listen to elevation tiles, create geometry objects, emit events |
 | `TerrainTextureObjectManager.ts` | Texture coordination | Listen to context tiles, create texture objects, emit events |
 | `TerrainGeometryFactory.ts` | Geometry creation | Convert elevation data → vertex buffer + normals |
 | `TerrainCanvasRenderer.ts` | Texture rendering | Draw features → canvas texture (painter's algorithm) |
-| `TerrainObjectFactory.ts` | Mesh integration | Create Three.js mesh (geometry + texture), position at tile center |
+| `TerrainObjectFactory.ts` | Mesh integration | Create Three.js mesh (geometry + texture), position relative to drone origin via `geoToLocal()` |
 | `ElevationDataManager.ts` | Tile caching | Fetch/cache elevation tiles, manage ring-based loading |
 | `ContextDataManager.ts` | Feature caching | Fetch/cache Overture tiles, manage feature extraction |
 

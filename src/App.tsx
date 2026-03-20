@@ -72,7 +72,8 @@ export function App() {
     terrainObjectManager = new TerrainObjectManager(
       viewer3D.getScene(),
       terrainGeometryManager,
-      terrainTextureManager
+      terrainTextureManager,
+      originManager
     );
 
     const elevationSampler = new ElevationSampler(elevationData);

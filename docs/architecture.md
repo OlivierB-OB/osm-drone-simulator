@@ -15,7 +15,7 @@ A real-time 3D drone simulator that renders the drone's viewpoint as it moves th
 - **Drone**: Simulates the drone as a moving object with position, heading, and altitude
 - **Receives**: Movement commands from DroneController
 - **Produces**: Updated location (coordinates) and orientation (direction facing)
-- **Key trait**: Handles physics in geographic coordinates (Mercator projection), independent of 3D visualization
+- **Key trait**: Handles physics in geographic coordinates (WGS84 lat/lng), independent of 3D visualization
 
 ### Animation & Timing
 - **AnimationLoop**: Orchestrates the frame-by-frame update cycle
@@ -108,7 +108,7 @@ flowchart TD
 Data loading (elevation, context), mesh creation, and rendering happen via event subscriptions; see `src/App.tsx` for how drone movement cascades into tile loading and visual updates.
 
 ### As Drone Moves
-- Drone moves through geographic coordinates (Mercator projection)
+- Drone moves through geographic coordinates (WGS84 lat/lng)
 - ElevationDataManager detects when drone has left the current data ring
 - New tiles are loaded in front, old tiles are unloaded behind
 - Terrain geometry and textures are regenerated/updated
@@ -132,7 +132,7 @@ Data loading (elevation, context), mesh creation, and rendering happen via event
 - Caching prevents redundant downloads as drone flies
 
 ### World Representation
-- The drone exists in real geographic coordinates (Mercator projection)
+- The drone exists in real geographic coordinates (WGS84 lat/lng)
 - Elevation data comes from real-world sources
 - Camera and rendering translate this geographic world into a 3D visualization
 - Users experience smooth flight through a real-world landscape

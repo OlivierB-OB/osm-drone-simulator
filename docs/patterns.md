@@ -8,7 +8,7 @@
 **Usage**: Foundation for all event-driven communication
 
 **Key Components**:
-- Drone: emits `locationChanged`, `azimuthChanged`, `elevationChanged`, `movingChanged`
+- Drone: emits `locationChanged` (`GeoCoordinates`), `azimuthChanged`, `elevationChanged`, `movingChanged`
 - ElevationDataManager: emits `tileAdded`, `tileRemoved`
 - ContextDataManager: emits `tileAdded`, `tileRemoved`
 - TerrainGeometryObjectManager: emits `tileAdded`, `tileRemoved`
@@ -51,7 +51,7 @@
 **Pattern**: Define event types as mapped objects
 ```typescript
 export type DroneEvents = {
-  locationChanged: MercatorCoordinates;
+  locationChanged: GeoCoordinates;
   azimuthChanged: number;
   elevationChanged: number;
   movingChanged: boolean;
@@ -59,17 +59,17 @@ export type DroneEvents = {
 ```
 
 ### Geometric Type Definitions
-**Files**: `src/gis/types.ts`, `src/data/elevation/types.ts`, `src/data/contextual/types.ts`
+**Files**: `src/gis/GeoCoordinates.ts`, `src/data/elevation/types.ts`, `src/data/contextual/types.ts`
 **Key Types**:
-- `MercatorCoordinates`: { x, y } - Web Mercator projection
+- `GeoCoordinates`: { lat, lng } - WGS84 geographic coordinates
 - `TileCoordinates`: { z, x, y } - Web Mercator tile system
-- `MercatorBounds`: { minX, maxX, minY, maxY } - Tile geographic bounds
+- `GeoBounds`: { minLat, maxLat, minLng, maxLng } - Tile geographic bounds
 - Domain types: BuildingVisual, Polygon, ContextDataTile
 
 ### Coordinate System Transformation
-**File**: `src/gis/types.ts`
-**Function**: `mercatorToThreeJs(location: MercatorCoordinates, elevation: number)`
-**Critical**: Negates Y to Z for Three.js (Mercator Y north → Three.js -Z forward)
+**File**: `src/gis/GeoCoordinates.ts`
+**Function**: `geoToLocal(lat, lng, elevation, origin: GeoCoordinates)`
+**Critical**: Converts WGS84 geographic coordinates to Three.js local tangent plane space relative to the drone (origin). X=east, Y=up, Z=south.
 
 ---
 
@@ -211,7 +211,7 @@ src/
 - `debugConfig` - debug visualization
 
 ### Utility Functions vs Classes
-- **Utility Functions**: Stateless, pure transformations (e.g., `mercatorToThreeJs()`)
+- **Utility Functions**: Stateless, pure transformations (e.g., `geoToLocal()`)
 - **Classes**: Stateful, resource-holding objects
 
 ---
@@ -240,16 +240,17 @@ src/
 ## Three.js Integration Patterns
 
 ### Coordinate System Transformation (Critical)
-**Problem**: Bridge Mercator geographic coordinates to Three.js world space
+**Problem**: Bridge WGS84 geographic coordinates to Three.js world space
 **Documented in**: `doc/coordinate-system.md`, verified by `src/gis/coordinateConsistency.test.ts`
 
-**Transformation**:
+**Transformation** via `geoToLocal(lat, lng, elevation, origin)`:
 ```
-Mercator X  →  Three.js X  (direct, East = +X)
-Mercator Y  →  Three.js Z  (negated, North = -Z)
-Elevation   →  Three.js Y  (direct, Up = +Y)
-Azimuth     →  rotation.y  (negated, clockwise = -rad)
+X = (lng - origin.lng) × cos(lat) × EARTH_RADIUS × π/180   // east
+Y = elevation                                                // up
+Z = -(lat - origin.lat) × EARTH_RADIUS × π/180             // south
+Azimuth  →  rotation.y  (negated, clockwise = -rad)
 ```
+The drone's position is the `origin`; it always renders at `(0, elevation, 0)`.
 
 ### Local Coordinate Space Pattern (Precision)
 **Problem**: Avoid float32 precision loss at large Mercator coordinates
@@ -302,7 +303,7 @@ mesh.traverse((child) => {
 | Lifecycle (dispose) | Resource cleanup | All managers | No memory leaks |
 | Constructor Injection | Testability | `Viewer3D`, `Camera`, `Scene` | Mock Three.js |
 | AbortSignal | Cancellation | Tile loaders | Clean shutdown |
-| Coordinate Transform | GPS→3D mapping | `mercatorToThreeJs()` | Correct rendering |
+| Coordinate Transform | GPS→3D mapping | `geoToLocal()` | Correct rendering |
 | Local Coordinate Space | Float32 precision | Building/terrain factories | Accuracy |
 | Concurrency Control | Server limits | Data managers | Rate limiting |
 | Persistence Cache | Offline support | Tile caches | Performance |

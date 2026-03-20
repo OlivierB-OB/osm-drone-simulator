@@ -176,12 +176,13 @@ flowchart TD
     MOM --> Scene["Three.js Scene"]
 ```
 
-All factories position objects using the same coordinate convention:
+All factories position objects using the same coordinate convention via `geoToLocal()`:
 ```
-threeX = mercator.x
-threeY = elevation
-threeZ = -mercator.y   // negation: Mercator Y northward → Three.js -Z northward
+X = (lng - origin.lng) × cos(lat) × EARTH_RADIUS × π/180   // east
+Y = elevation                                                // up
+Z = -(lat - origin.lat) × EARTH_RADIUS × π/180             // south
 ```
+Where `origin` is the drone's current lat/lng (the Three.js world origin).
 
 ---
 
@@ -284,6 +285,6 @@ flowchart LR
 - **Canvas rendering**: [`visualization/canvas-rendering.md`](visualization/canvas-rendering.md)
 - **Ground surface (terrain mesh)**: [`visualization/ground-surface.md`](visualization/ground-surface.md)
 - **3D objects**: [`visualization/objects.md`](visualization/objects.md)
-- **Coordinate system**: [`coordinate-system.md`](coordinate-system.md) — Mercator → Three.js math
+- **Coordinate system**: [`coordinate-system.md`](coordinate-system.md) — geographic → Three.js local tangent plane math
 - **Tile ring system**: [`tile-ring-system.md`](tile-ring-system.md) — ring loading details
 - **Glossary**: [`glossary.md`](glossary.md)

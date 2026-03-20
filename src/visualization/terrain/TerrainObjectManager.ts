@@ -6,6 +6,7 @@ import type { TerrainTextureObjectManager } from './texture/TerrainTextureObject
 import type { TileKey } from './geometry/types';
 import type { TileResource } from './types';
 import { TileObjectManager } from '../TileObjectManager';
+import { OriginManager } from '../../gis/OriginManager';
 
 /**
  * Manages terrain mesh resources in the 3D scene.
@@ -24,6 +25,7 @@ export class TerrainObjectManager extends TileObjectManager<
     private readonly scene: Scene,
     private readonly geometryManager: TerrainGeometryObjectManager,
     private readonly textureManager: TerrainTextureObjectManager,
+    private readonly originManager: OriginManager,
     private readonly factory: TerrainObjectFactory = new TerrainObjectFactory()
   ) {
     super(geometryManager, [textureManager]);
@@ -37,7 +39,8 @@ export class TerrainObjectManager extends TileObjectManager<
       this.textureManager.getTerrainTextureObject(key) ?? null;
     const terrainObject = this.factory.createTerrainObject(
       geometryResource,
-      textureResource
+      textureResource,
+      this.originManager.getOrigin()
     );
     this.scene.add(terrainObject.resource);
     return terrainObject;
