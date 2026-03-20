@@ -1,3 +1,5 @@
+import { Tooltip } from './Tooltip';
+
 const ELEVATION_ATTRIBUTION = [
   `ArcticDEM terrain data DEM(s) were created from DigitalGlobe, Inc., imagery and funded under National Science Foundation awards 1043681, 1559691, and 1542736; `,
   `Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017; `,
@@ -28,15 +30,19 @@ export function AttributionBar() {
       <span> | </span>
       <span>
         Elevation:{' '}
-        <a
-          href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
-          target="_blank"
-          rel="noopener"
-          title={ELEVATION_ATTRIBUTION}
-          class="text-gray-900 no-underline hover:underline"
+        <Tooltip
+          content={ELEVATION_ATTRIBUTION}
+          contentClass="max-w-sm whitespace-pre-line"
         >
-          AWS Terrain Tiles
-        </a>
+          <a
+            href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
+            target="_blank"
+            rel="noopener"
+            class="text-gray-900 no-underline hover:underline"
+          >
+            AWS Terrain Tiles
+          </a>
+        </Tooltip>
       </span>
     </div>
   );
