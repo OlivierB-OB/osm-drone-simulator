@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as THREE from 'three';
 import type { ContextDataTile } from '../../data/contextual/types';
 import type { Scene } from '../../3Dviewer/Scene';
 import type { ElevationSampler } from './util/ElevationSampler';
 import type { ContextDataManager } from '../../data/contextual/ContextDataManager';
-import type { Object3D } from 'three';
 import { OriginManager } from '../../gis/OriginManager';
 
 // Mock the registry module
-const mockCreateAllMeshes = vi.fn((): Object3D[] => []);
+const mockCreateAllMeshes = vi.fn((): THREE.Object3D[] => []);
 vi.mock('../../features/registry', () => ({
   featureRegistry: {
     createAllMeshes: () => mockCreateAllMeshes(),
@@ -74,19 +74,12 @@ function makeTile(key: string): ContextDataTile {
   };
 }
 
-type MockMesh = Object3D & {
-  geometry: { dispose: ReturnType<typeof vi.fn> };
-  material: { dispose: ReturnType<typeof vi.fn> };
-};
-
-function makeMockMesh(): MockMesh {
-  const geometry = { dispose: vi.fn() };
-  const material = { dispose: vi.fn() };
-  return {
-    traverse: vi.fn((cb: (obj: unknown) => void) => cb({ geometry, material })),
-    geometry,
-    material,
-  } as unknown as MockMesh;
+function makeMockMesh(): THREE.Mesh {
+  const geometry = new THREE.BufferGeometry();
+  vi.spyOn(geometry, 'dispose');
+  const material = new THREE.MeshBasicMaterial();
+  vi.spyOn(material, 'dispose');
+  return new THREE.Mesh(geometry, material);
 }
 
 describe('MeshObjectManager', () => {
@@ -135,14 +128,23 @@ describe('MeshObjectManager', () => {
       ).not.toThrow();
     });
 
-    it('adds factory-produced meshes to scene', () => {
+    it('adds a Group to scene', () => {
+      buildManager();
+      dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
+
+      expect(scene.add).toHaveBeenCalledWith(expect.any(THREE.Group));
+    });
+
+    it('includes factory-produced meshes inside the group', () => {
       const mesh = makeMockMesh();
       mockCreateAllMeshes.mockReturnValue([mesh]);
 
       buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
 
-      expect(scene.add).toHaveBeenCalledWith(mesh);
+      const group = (scene.add as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as THREE.Group;
+      expect(group.children).toContain(mesh);
     });
   });
 
@@ -152,20 +154,28 @@ describe('MeshObjectManager', () => {
       expect(() => dataSource.fireRemoved('9:999:999')).not.toThrow();
     });
 
-    it('removes mesh from scene and disposes geometry and material', () => {
+    it('removes the group from scene and disposes geometry and material', () => {
       const mesh = makeMockMesh();
       mockCreateAllMeshes.mockReturnValue([mesh]);
 
       buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
+
+      const group = (scene.add as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as THREE.Group;
+
       dataSource.fireRemoved('9:261:168');
 
-      expect(scene.remove).toHaveBeenCalledWith(mesh);
-      expect(mesh.geometry.dispose).toHaveBeenCalled();
-      expect(mesh.material.dispose).toHaveBeenCalled();
+      expect(scene.remove).toHaveBeenCalledWith(group);
+      expect(
+        mesh.geometry.dispose as ReturnType<typeof vi.fn>
+      ).toHaveBeenCalled();
+      expect(
+        (mesh.material as THREE.Material).dispose as ReturnType<typeof vi.fn>
+      ).toHaveBeenCalled();
     });
 
-    it('does not re-remove mesh after second tileRemoved for same key', () => {
+    it('does not re-remove group after second tileRemoved for same key', () => {
       const mesh = makeMockMesh();
       mockCreateAllMeshes.mockReturnValue([mesh]);
 
@@ -198,12 +208,11 @@ describe('MeshObjectManager', () => {
 
       // Reset for rebuild detection
       vi.clearAllMocks();
-      const newMesh = makeMockMesh();
-      mockCreateAllMeshes.mockReturnValue([newMesh]);
+      mockCreateAllMeshes.mockReturnValue([makeMockMesh()]);
 
       elevationSource.fireAdded('9:261:168');
 
-      // Old mesh removed before new mesh added
+      // Old group removed before new group added
       expect(scene.remove).toHaveBeenCalled();
       expect(scene.add).toHaveBeenCalled();
     });
@@ -218,8 +227,12 @@ describe('MeshObjectManager', () => {
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
       elevationSource.fireAdded('9:261:168');
 
-      expect(mesh.geometry.dispose).toHaveBeenCalled();
-      expect(mesh.material.dispose).toHaveBeenCalled();
+      expect(
+        mesh.geometry.dispose as ReturnType<typeof vi.fn>
+      ).toHaveBeenCalled();
+      expect(
+        (mesh.material as THREE.Material).dispose as ReturnType<typeof vi.fn>
+      ).toHaveBeenCalled();
     });
   });
 
@@ -237,15 +250,12 @@ describe('MeshObjectManager', () => {
       );
     });
 
-    it('removes all remaining stored meshes from scene', () => {
-      const mesh = makeMockMesh();
-      mockCreateAllMeshes.mockReturnValue([mesh]);
-
+    it('removes all remaining groups from scene', () => {
       const manager = buildManager();
       dataSource.fireAdded('9:261:168', makeTile('9:261:168'));
       manager.dispose();
 
-      expect(scene.remove).toHaveBeenCalledWith(mesh);
+      expect(scene.remove).toHaveBeenCalledWith(expect.any(THREE.Group));
     });
 
     it('does not throw when disposing empty manager', () => {

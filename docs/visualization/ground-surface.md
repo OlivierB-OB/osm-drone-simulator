@@ -248,6 +248,8 @@ mesh.position.set(pos.x, pos.y, pos.z);
 
 Where `origin` = `originManager.getOrigin()` (drone's current lat/lng). Z-negation is internal to `geoToLocal()`, not done manually.
 
+**Origin change repositioning**: When the drone moves, `TerrainObjectManager` subscribes to `OriginManager.onChange()` and repositions all existing tile meshes using `geoToLocal(tileCenter, newOrigin)`. Newly-loaded tiles are positioned with the current origin at creation time.
+
 ---
 
 ## Coordinate System & Local Tangent Plane

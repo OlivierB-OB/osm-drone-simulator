@@ -7,6 +7,7 @@ import type { TileKey } from './geometry/types';
 import type { TileResource } from './types';
 import { TileObjectManager } from '../TileObjectManager';
 import { OriginManager } from '../../gis/OriginManager';
+import { geoToLocal, type GeoCoordinates } from '../../gis/GeoCoordinates';
 
 /**
  * Manages terrain mesh resources in the 3D scene.
@@ -16,6 +17,9 @@ import { OriginManager } from '../../gis/OriginManager';
  * Meshes are created as soon as geometry arrives; if a texture is available
  * at that point it is applied immediately. When a texture arrives later,
  * the mesh is rebuilt (dispose + recreate) with the texture applied.
+ *
+ * When the drone moves and the origin changes, all existing tile meshes are
+ * repositioned exactly via geoToLocal(tileCenter, newOrigin).
  */
 export class TerrainObjectManager extends TileObjectManager<
   TileResource<BufferGeometry>,
@@ -29,6 +33,7 @@ export class TerrainObjectManager extends TileObjectManager<
     private readonly factory: TerrainObjectFactory = new TerrainObjectFactory()
   ) {
     super(geometryManager, [textureManager]);
+    this.originManager.onChange(this.onOriginChange);
   }
 
   protected override createObject(
@@ -62,8 +67,22 @@ export class TerrainObjectManager extends TileObjectManager<
    * Clean up all objects, remove from scene, and dispose owned sub-managers.
    */
   override dispose(): void {
+    this.originManager.offChange(this.onOriginChange);
     super.dispose();
     this.geometryManager.dispose();
     this.textureManager.dispose();
   }
+
+  private readonly onOriginChange = (newOrigin: GeoCoordinates): void => {
+    for (const tile of this.objects.values()) {
+      const b = tile.bounds;
+      const pos = geoToLocal(
+        (b.minLat + b.maxLat) / 2,
+        (b.minLng + b.maxLng) / 2,
+        0,
+        newOrigin
+      );
+      tile.resource.position.set(pos.x, pos.y, pos.z);
+    }
+  };
 }

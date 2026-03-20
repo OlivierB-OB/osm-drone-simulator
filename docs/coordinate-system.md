@@ -2,91 +2,84 @@
 
 ## World Representation
 
-Every world object is described by three properties:
-
 | Property | Type | Description |
 |----------|------|-------------|
-| **Location** | `MercatorCoordinates {x, y}` | Position in Web Mercator projection (meters) |
+| **Location** | `GeoCoordinates {lat, lng}` | WGS84 geographic coordinates (degrees) |
 | **Azimuth** | `number` (degrees) | Compass heading: 0=North, 90=East, 180=South, 270=West |
 | **Elevation** | `number` (meters) | Altitude above sea level |
 
-## Mercator Coordinates
+## Geographic Coordinates (WGS84)
 
-Standard Web Mercator projection (EPSG:3857):
+All positions are stored as `GeoCoordinates {lat, lng}` in degrees:
+- **lat** increases northward (−90 to +90)
+- **lng** increases eastward (−180 to +180)
 
-- **X** increases **eastward**
-- **Y** increases **northward**
-- Origin at (0, 0) = intersection of equator and prime meridian
-- Paris (48.853N, 2.350E) = approximately (261,700 , 6,250,000)
+## Local Tangent Plane: geoToLocal()
 
-Conversion from latitude/longitude:
-
-```
-x = longitude * PI / 180 * EarthRadius
-y = ln(tan((90 + latitude) * PI / 360)) * EarthRadius
-```
-
-## Three.js Coordinate Mapping
-
-Three.js uses a right-handed coordinate system. The mapping from Mercator:
+Three.js requires Cartesian (metric) coordinates. `geoToLocal(lat, lng, elevation, origin)`
+projects a geographic point onto a local tangent plane centered at `origin` (the drone's position):
 
 ```
-Three.js X = Mercator X         (East = +X)
-Three.js Y = Elevation          (Up = +Y)
-Three.js Z = -Mercator Y        (North = -Z)
+X = (lng - origin.lng) × cos(origin.lat) × EARTH_RADIUS × π/180   // east → +X
+Y = elevation                                                        // up → +Y
+Z = -(lat - origin.lat) × EARTH_RADIUS × π/180                      // north → -Z
 ```
 
-The Z negation is required because Mercator Y increases northward, but Three.js convention has the default camera looking along -Z. This makes North align with the default "forward" direction.
+The drone is always at `(0, elevation, 0)`. All scene objects are expressed as metric offsets from the drone.
 
-### Direction Vectors in Three.js
+## Origin Rebasing (OriginManager)
 
-For a given azimuth angle (in radians):
+`OriginManager` holds the drone's current `{lat, lng}` as the Three.js world origin.
+
+- When the drone moves, `OriginManager.setOrigin(newGeo)` is called.
+- Subscribers (`TerrainObjectManager`, `MeshObjectManager`) register via `onChange()` and **reposition all existing tile meshes** by calling `geoToLocal(tileCenter, newOrigin)` for each tile.
+- Newly created tiles are positioned with the current origin at creation time.
+
+This keeps the drone at `(0, elevation, 0)` while the world moves around it.
+
+## Direction Vectors in Three.js
+
+For a given azimuth (in radians):
 
 ```
 Forward = (sin(azimuth), 0, -cos(azimuth))
 Right   = (cos(azimuth), 0,  sin(azimuth))
-Behind  = (-sin(azimuth), 0, cos(azimuth))
 ```
 
 Verification:
-- Azimuth 0 (North): forward = (0, 0, -1) = -Z direction
-- Azimuth 90 (East): forward = (1, 0, 0) = +X direction
+- Azimuth 0 (North): forward = (0, 0, −1) = −Z direction ✓
+- Azimuth 90 (East): forward = (1, 0, 0) = +X direction ✓
 
-### Object Rotation
+## Object Rotation
 
-Azimuth increases clockwise (viewed from above), but Three.js `rotation.y` increases counterclockwise. Therefore:
+Azimuth increases clockwise (compass), but Three.js `rotation.y` increases counterclockwise:
 
 ```
 rotation.y = -azimuthRad
 ```
 
-## Drone Movement
-
-Movement in Mercator space (no negation needed since Y increases northward):
+## Drone Movement (Great-Circle Displacement)
 
 ```
-Forward:
-  location.x += sin(azimuth) * speed * deltaTime
-  location.y += cos(azimuth) * speed * deltaTime
+dNorth = (cos(azimuth) × netForward + cos(azimuth + π/2) × netRight) × speed × dt
+dEast  = (sin(azimuth) × netForward + sin(azimuth + π/2) × netRight) × speed × dt
 
-Right (strafe):
-  rightAzimuth = azimuth + PI/2
-  location.x += sin(rightAzimuth) * speed * deltaTime
-  location.y += cos(rightAzimuth) * speed * deltaTime
+lat += dNorth / EARTH_RADIUS / (π/180)
+lng += dEast  / (EARTH_RADIUS × cos(lat × π/180)) / (π/180)
 ```
+
+Speed is 15 m/s (configured in `src/config.ts`).
 
 ## Chase Camera
 
-The camera is positioned behind and above the drone, looking at it.
-
 ```
-cameraX = droneThreeX - sin(azimuth) * chaseDistance
-cameraY = droneThreeY + chaseHeight
-cameraZ = droneThreeZ + cos(azimuth) * chaseDistance
-camera.lookAt(droneThreeX, droneThreeY, droneThreeZ)
+cameraX = 0 - sin(azimuth) × chaseDistance
+cameraY = droneElevation + chaseHeight
+cameraZ = 0 + cos(azimuth) × chaseDistance
+camera.lookAt(0, droneElevation, 0)
 ```
 
-The `lookAt` call handles all rotation automatically -- no manual Euler angle math needed.
+The drone is always at `(0, elevation, 0)`, so the camera is offset from the origin. `lookAt` handles all rotation automatically.
 
 ## Controls
 
@@ -100,12 +93,27 @@ The `lookAt` call handles all rotation automatically -- no manual Euler angle ma
 | Mouse wheel up | Increase elevation |
 | Mouse wheel down | Decrease elevation |
 
-## Terrain Mesh Positioning
+## Terrain Tile Positioning
 
-Terrain tiles are positioned consistently with the same mapping:
+Each terrain tile is a single `THREE.Mesh` positioned at its geographic center:
 
+```typescript
+const pos = geoToLocal(centerLat, centerLng, 0, origin);
+mesh.position.set(pos.x, pos.y, pos.z);
 ```
-mesh.position.x = (bounds.minX + bounds.maxX) / 2    // Mercator X center
-mesh.position.y = 0                                   // Ground level
-mesh.position.z = -((bounds.minY + bounds.maxY) / 2)  // -Mercator Y center
+
+When origin changes (drone moves), `TerrainObjectManager` repositions all existing tiles using their stored `GeoBounds`.
+
+## Feature Mesh Positioning (3D Objects)
+
+Feature tiles (buildings, barriers, vegetation, etc.) are wrapped in a `THREE.Group` per tile:
+
+```typescript
+// Group at tile center:
+group.position.set(geoToLocal(tileCenterLat, tileCenterLng, 0, origin));
+
+// Features inside group, relative to tile center:
+mesh.position.set(geoToLocal(featureLat, featureLng, elev, tileCenter));
 ```
+
+When origin changes, `MeshObjectManager` repositions each group's position from its stored `GeoBounds` — feature mesh local positions within the group are unchanged.

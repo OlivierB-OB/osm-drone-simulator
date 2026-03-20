@@ -529,7 +529,7 @@ Verification: All drone/camera/object positioning uses this formula consistently
 
 For a complete explanation of the bilinear interpolation algorithm, API documentation, precision details, and edge case handling, see **[Elevation Sampling & Interpolation](../data/elevation-sampler.md)**.
 
-**Briefly:** Each mesh factory calls `elevationSampler.sampleAt(mercatorX, mercatorY)` to determine terrain height at an object's location. The sampler uses bilinear interpolation to blend values from 4 neighboring elevation pixels, producing smooth terrain without visible pixelation.
+**Briefly:** Each mesh factory calls `elevationSampler.sampleAt(lat, lng)` to determine terrain height at an object's location. The sampler uses bilinear interpolation to blend values from 4 neighboring elevation pixels, producing smooth terrain without visible pixelation.
 
 The algorithm accounts for critical details:
 - **Mercator Y inversion** (row 0 = north edge, increases southward)
@@ -539,15 +539,15 @@ The algorithm accounts for critical details:
 
 ### Why Objects Align Correctly
 
-**Coordinate Consistency Across All Components:**
+All feature meshes are positioned using `geoToLocal(lat, lng, elevation, tileCenter)` relative to their tile's geographic center. The tile group is then positioned at `geoToLocal(tileCenter, droneOrigin)`. This two-level placement keeps all objects spatially consistent:
 
-1. **Buildings**: `position.set(centroidX, terrainY, -centroidY)` in BuildingMeshFactory.ts: createBuildingMesh() method (line 186)
-2. **Vegetation**: `matrix.setPosition(x, terrainY + offset, -y)` in VegetationMeshFactory.ts: strategy create() methods
-3. **Structures**: `obj.position.set(mx, terrainY + offset, -my)` in StructureMeshFactory.ts: createStructureMesh() method (line 53)
-4. **Barriers**: `mesh.position.set(midX, terrainY + offset, -midY)` in BarrierMeshFactory.ts: createBarrierMeshes() method (line 49)
-5. **Bridges**: `mesh.position.set(midX, terrainY + offset, -midY)` in BridgeMeshFactory.ts: createDeckSegments() method (line 79)
+1. **Buildings** — `geoToLocal(centroidLat, centroidLng, terrainY, tileCenter)` (BuildingMeshFactory)
+2. **Vegetation** — `geoToLocal(treeLat, treeLng, terrainY + offset, tileCenter)` (vegetation strategies)
+3. **Structures** — `geoToLocal(lat, lng, terrainY + offset, tileCenter)` (StructureMeshFactory)
+4. **Barriers** — `geoToLocal(segmentMidLat, segmentMidLng, terrainY + offset, tileCenter)` (BarrierMeshFactory)
+5. **Bridges** — `geoToLocal(segmentMidLat, segmentMidLng, terrainY + offset, tileCenter)` (BridgeMeshFactory)
 
-All use the same formula: `(mercatorX, elevation, -mercatorY)`, ensuring spatial alignment.
+All use the same `geoToLocal()` formula with the tile center as origin, ensuring spatial alignment within each tile group.
 
 ---
 

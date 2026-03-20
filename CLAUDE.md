@@ -59,7 +59,7 @@ Full docs in `docs/`. See `docs/README.md` for the complete index.
 - `src/core/AnimationLoop.ts` - requestAnimationFrame loop, delta time (seconds), frame synchronization
 - `src/drone/` - Drone physics (GeoCoordinates {lat, lng}), DroneController (keyboard input, arrow keys)
 - `src/gis/GeoCoordinates.ts` - Core geo math: `geoToLocal`, `getTileCoordinatesFromGeo`, `getTileGeoBounds`, `EARTH_RADIUS`
-- `src/gis/OriginManager.ts` - Holds the current Three.js origin (drone position) for coordinate conversion
+- `src/gis/OriginManager.ts` - Holds drone position as Three.js origin; `onChange`/`offChange` callbacks let `TerrainObjectManager` and `MeshObjectManager` reposition existing tiles on each drone move
 - `src/data/` - ElevationDataManager (tile caching, z:x:y keys, AWS Terrarium PNG), ContextDataManager; `src/data/shared/tileLoaderUtils.ts` for cache-then-load pattern
 - `src/visualization/terrain/` - TerrainGeometryObjectManager + TerrainTextureObjectManager → TerrainObjectManager → TerrainObjectFactory → Three.js meshes (orchestrated pipeline)
 - `src/visualization/DroneObject.ts` - Cone mesh representing the drone in the scene

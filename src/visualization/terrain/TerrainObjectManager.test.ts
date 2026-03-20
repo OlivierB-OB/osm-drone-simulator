@@ -16,7 +16,11 @@ describe('TerrainObjectManager', () => {
   let mockTextureManager: TerrainTextureObjectManager;
   let mockFactory: TerrainObjectFactory;
   let mockElevationData: Partial<ElevationDataManager>;
-  let mockOriginManager: { getOrigin: ReturnType<typeof vi.fn> };
+  let mockOriginManager: {
+    getOrigin: ReturnType<typeof vi.fn>;
+    onChange: ReturnType<typeof vi.fn>;
+    offChange: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockScene = {
@@ -51,6 +55,8 @@ describe('TerrainObjectManager', () => {
 
     mockOriginManager = {
       getOrigin: vi.fn(() => ({ lat: 48.855, lng: 2.345 })),
+      onChange: vi.fn(),
+      offChange: vi.fn(),
     };
 
     manager = new TerrainObjectManager(
