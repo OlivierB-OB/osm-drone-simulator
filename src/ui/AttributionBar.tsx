@@ -14,12 +14,13 @@ const ELEVATION_ATTRIBUTION = [
 
 export function AttributionBar() {
   return (
-    <div class="attribution-bar">
+    <div class="py-3 px-6 bg-white text-[13px] leading-[1.4] text-gray-900 text-right border-t border-gray-900 shrink-0">
       <span>
         <a
           href="https://docs.overturemaps.org/attribution/"
           target="_blank"
           rel="noopener"
+          class="text-gray-900 no-underline hover:underline"
         >
           OpenStreetMap contributors, Overture Maps Foundation
         </a>
@@ -32,6 +33,7 @@ export function AttributionBar() {
           target="_blank"
           rel="noopener"
           title={ELEVATION_ATTRIBUTION}
+          class="text-gray-900 no-underline hover:underline"
         >
           AWS Terrain Tiles
         </a>
