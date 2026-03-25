@@ -19,6 +19,7 @@ import { OriginManager } from './gis/OriginManager';
 import { droneConfig } from './config';
 import { AttributionBar } from './ui/AttributionBar';
 import { Header } from './ui/Header';
+import type { InterestingPlace } from './data/places/interestingPlaces';
 
 export function App() {
   let viewer3D: Viewer3D | null = null;
@@ -108,7 +109,16 @@ export function App() {
 
   return (
     <div class="app">
-      <Header onLocationSelect={(geo) => drone?.teleport(geo)} />
+      <Header
+        onLocationSelect={(geo) => drone?.teleport(geo)}
+        onPlaceSelect={(place: InterestingPlace) => {
+          drone?.teleport({ lat: place.lat, lng: place.lng });
+          if (drone) {
+            const elevationDelta = place.elevation - drone.getElevation();
+            drone.changeElevation(elevationDelta);
+          }
+        }}
+      />
       <div id="threejs-container" />
       <AttributionBar />
     </div>

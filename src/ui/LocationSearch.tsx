@@ -1,6 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js';
 import { Combobox } from '@kobalte/core/combobox';
-import { TbOutlineSearch } from 'solid-icons/tb';
+import { TbOutlineSearch, TbOutlineMapPin } from 'solid-icons/tb';
 import type { GeoCoordinates } from '../gis/GeoCoordinates';
 
 type NominatimResult = {
@@ -11,6 +11,7 @@ type NominatimResult = {
 
 type Props = {
   onSelect: (geo: GeoCoordinates) => void;
+  onDiscoverClick: () => void;
 };
 
 export function LocationSearch(props: Props) {
@@ -73,7 +74,15 @@ export function LocationSearch(props: Props) {
           class="absolute left-2.5 text-gray-400 pointer-events-none"
           size={16}
         />
-        <Combobox.Input class="w-[25vw] pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400" />
+        <Combobox.Input class="w-[25vw] pl-8 pr-10 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400" />
+        <button
+          type="button"
+          onClick={props.onDiscoverClick}
+          class="absolute right-2.5 text-gray-700 cursor-pointer hover:text-gray-900 transition-colors"
+          title="Discover interesting places"
+        >
+          <TbOutlineMapPin size={16} />
+        </button>
       </Combobox.Control>
       <Combobox.Portal>
         <Combobox.Content class="z-50 bg-white border border-gray-200 rounded-md shadow-lg mt-1 overflow-hidden animate-in fade-in-0 zoom-in-95">

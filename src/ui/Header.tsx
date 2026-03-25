@@ -1,20 +1,34 @@
+import { createSignal } from 'solid-js';
 import { SiGithub, SiOpenstreetmap, SiThreedotjs } from 'solid-icons/si';
 import { TbOutlineMap } from 'solid-icons/tb';
 import { Tooltip } from './Tooltip';
 import { LocationSearch } from './LocationSearch';
+import { PlacesModal } from './PlacesModal';
 import type { GeoCoordinates } from '../gis/GeoCoordinates';
+import type { InterestingPlace } from '../data/places/interestingPlaces';
 
 type Props = {
   onLocationSelect: (geo: GeoCoordinates) => void;
+  onPlaceSelect: (place: InterestingPlace) => void;
 };
 
 export function Header(props: Props) {
+  const [placesModalOpen, setPlacesModalOpen] = createSignal(false);
+
   return (
     <header class="py-4 grid grid-cols-[1fr_auto_1fr] items-center px-6 bg-white text-gray-900 border-b border-gray-900 shrink-0">
       <span class="text-base font-semibold tracking-[0.04em]">
         OSM Drone Simulator
       </span>
-      <LocationSearch onSelect={props.onLocationSelect} />
+      <LocationSearch
+        onSelect={props.onLocationSelect}
+        onDiscoverClick={() => setPlacesModalOpen(true)}
+      />
+      <PlacesModal
+        open={placesModalOpen()}
+        onOpenChange={setPlacesModalOpen}
+        onPlaceSelect={props.onPlaceSelect}
+      />
       <div class="flex justify-end gap-4">
         <Tooltip content="Map data © OpenStreetMap contributors">
           <a
