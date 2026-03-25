@@ -9,6 +9,7 @@ import {
   Path,
 } from 'three';
 import centroid from '@turf/centroid';
+import area from '@turf/area';
 import type { Polygon } from 'geojson';
 import type { BuildingVisual } from './types';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
@@ -62,7 +63,12 @@ export class BuildingMeshFactory {
     const meshes: Object3D[] = [];
     for (const building of buildings) {
       if (building.geometry.type !== 'Polygon') continue;
-      if (!building.isPart && building.hasParts) continue;
+      if (building.parentId) continue;
+
+      if (!building.isPart && building.hasParts && building.children) {
+        this.renderParentGroup(building, origin, meshes);
+        continue;
+      }
 
       const mesh = this.createBuildingMesh(building, building.geometry, origin);
       if (mesh) meshes.push(mesh);
@@ -70,10 +76,50 @@ export class BuildingMeshFactory {
     return meshes;
   }
 
+  private renderParentGroup(
+    parent: BuildingVisual,
+    origin: GeoCoordinates,
+    meshes: Object3D[]
+  ): void {
+    const parentPolygon = parent.geometry as Polygon;
+    const [cLng, cLat] = centroid(parentPolygon).geometry.coordinates;
+    const parentElevation = this.elevation.sampleAt(cLat!, cLng!);
+
+    const parentArea = area(parentPolygon);
+    if (parentArea > 0) {
+      const childrenArea = parent.children!.reduce((sum, child) => {
+        if (child.geometry.type !== 'Polygon') return sum;
+        return sum + area(child.geometry);
+      }, 0);
+      const coverage = childrenArea / parentArea;
+      if (coverage < 0.6) {
+        const mesh = this.createBuildingMesh(
+          parent,
+          parentPolygon,
+          origin,
+          parentElevation
+        );
+        if (mesh) meshes.push(mesh);
+      }
+    }
+
+    for (const child of parent.children!) {
+      if (child.geometry.type !== 'Polygon') continue;
+      const mesh = this.createBuildingMesh(
+        child,
+        child.geometry,
+        origin,
+        parentElevation
+      );
+      if (mesh) meshes.push(mesh);
+    }
+  }
+
   private createBuildingMesh(
     building: BuildingVisual,
     polygon: Polygon,
-    origin: GeoCoordinates
+    origin: GeoCoordinates,
+    elevationOverride?: number
   ): Object3D | null {
     try {
       const outerRing = polygon.coordinates[0] as [number, number][];
@@ -161,8 +207,9 @@ export class BuildingMeshFactory {
         wallMaterial,
       ]);
 
-      // World position: sample elevation at centroid
-      const terrainElevation = this.elevation.sampleAt(centerLat, centerLng);
+      // World position: use override (child parts) or sample at centroid
+      const terrainElevation =
+        elevationOverride ?? this.elevation.sampleAt(centerLat, centerLng);
       const worldY = terrainElevation + minHeight;
 
       if (isPitched && roofHeight > 0) {

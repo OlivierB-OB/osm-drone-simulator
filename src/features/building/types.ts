@@ -20,6 +20,8 @@ export interface BuildingVisual {
   roofOrientation?: 'along' | 'across'; // ridge orientation relative to longest wall
   isPart?: boolean; // true when building:part=yes
   hasParts?: boolean; // true when building:part polygons are spatially contained within this building
+  children?: BuildingVisual[]; // nested building parts linked during post-processing
+  parentId?: string; // set on parts linked to a parent (skipped in flat iteration)
 }
 
 export interface ModuleFeatures {

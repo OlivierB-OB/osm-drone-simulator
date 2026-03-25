@@ -3,12 +3,14 @@ import type { Object3D } from 'three';
 import type { ElevationSampler } from '../../visualization/mesh/util/ElevationSampler';
 import type { GeoCoordinates } from '../../gis/GeoCoordinates';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
-import booleanContains from '@turf/boolean-contains';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import centroid from '@turf/centroid';
+import type { Polygon } from 'geojson';
 import type { BuildingVisual, ModuleFeatures } from './types';
 
-function markBuildingParents(buildings: BuildingVisual[]): void {
+function nestBuildingParts(buildings: BuildingVisual[]): void {
   const nonParts = buildings.filter(
-    (b) => !b.isPart && !b.hasParts && b.geometry.type === 'Polygon'
+    (b) => !b.isPart && b.geometry.type === 'Polygon'
   );
   const parts = buildings.filter(
     (b) => b.isPart && b.geometry.type === 'Polygon'
@@ -16,8 +18,16 @@ function markBuildingParents(buildings: BuildingVisual[]): void {
 
   for (const part of parts) {
     for (const parent of nonParts) {
-      if (booleanContains(parent.geometry, part.geometry)) {
+      if (
+        booleanPointInPolygon(
+          centroid(part.geometry),
+          parent.geometry as Polygon
+        )
+      ) {
         parent.hasParts = true;
+        parent.children ??= [];
+        parent.children.push(part);
+        part.parentId = parent.id;
         break;
       }
     }
@@ -32,7 +42,7 @@ export const buildingModule: FeatureModule<ModuleFeatures> = {
   },
 
   postProcess(features: ModuleFeatures): void {
-    markBuildingParents(features.buildings);
+    nestBuildingParts(features.buildings);
   },
 
   createMeshes(

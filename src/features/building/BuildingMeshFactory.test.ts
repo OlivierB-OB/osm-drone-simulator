@@ -19,9 +19,43 @@ const rectanglePolygon: Polygon = {
   ],
 };
 
+// Small child polygon covering ~25% of parent
+const smallChildPolygon: Polygon = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [100, 50],
+      [110, 50],
+      [110, 55],
+      [100, 55],
+      [100, 50],
+    ],
+  ],
+};
+
+// Large child polygon covering ~95% of parent
+const largeChildPolygon: Polygon = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [100.5, 50.2],
+      [119.5, 50.2],
+      [119.5, 59.8],
+      [100.5, 59.8],
+      [100.5, 50.2],
+    ],
+  ],
+};
+
 const mockElevation: ElevationSampler = {
   sampleAt: () => 0,
 } as unknown as ElevationSampler;
+
+function makeSampler(
+  fn: (lat: number, lng: number) => number
+): ElevationSampler {
+  return { sampleAt: fn } as unknown as ElevationSampler;
+}
 
 function makeBuilding(overrides: Partial<BuildingVisual> = {}): BuildingVisual {
   return {
@@ -121,17 +155,54 @@ describe('BuildingMeshFactory', () => {
     expect(roofMesh.position.y).toBeGreaterThanOrEqual(1);
   });
 
-  it('skips parent buildings when hasParts is true', () => {
+  it('renders parent when children cover less than 90% area', () => {
+    const child = makeBuilding({
+      id: 'child-1',
+      geometry: smallChildPolygon,
+      isPart: true,
+      parentId: 'parent-1',
+    });
     const parent = makeBuilding({
       id: 'parent-1',
       isPart: false,
       hasParts: true,
+      children: [child],
     });
-    const result = factory.create([parent], origin);
+    const result = factory.create([parent, child], origin);
+    // parent + child = 2 meshes
+    expect(result).toHaveLength(2);
+  });
+
+  it('skips parent when children cover 90% or more area', () => {
+    const child = makeBuilding({
+      id: 'child-1',
+      geometry: largeChildPolygon,
+      isPart: true,
+      parentId: 'parent-1',
+    });
+    const parent = makeBuilding({
+      id: 'parent-1',
+      isPart: false,
+      hasParts: true,
+      children: [child],
+    });
+    const result = factory.create([parent, child], origin);
+    // only child rendered
+    expect(result).toHaveLength(1);
+  });
+
+  it('skips linked parts in flat iteration (rendered via parent)', () => {
+    const part = makeBuilding({
+      id: 'part-1',
+      isPart: true,
+      parentId: 'parent-1',
+    });
+    // Part alone in list without parent — should be skipped because parentId is set
+    const result = factory.create([part], origin);
     expect(result).toHaveLength(0);
   });
 
-  it('renders building parts regardless of hasParts on other buildings', () => {
+  it('renders orphan parts normally', () => {
     const part = makeBuilding({ id: 'part-1', isPart: true });
     const result = factory.create([part], origin);
     expect(result).toHaveLength(1);
@@ -150,5 +221,40 @@ describe('BuildingMeshFactory', () => {
     // Roof mesh position should be less than total height (some portion used for roof)
     expect(group.children[1]!.position.y).toBeLessThan(10);
     expect(group.children[1]!.position.y).toBeGreaterThan(0);
+  });
+
+  it('uses min contour elevation for standalone buildings', () => {
+    const sampler = makeSampler((lat, _lng) => (lat === 50 ? 100 : 200));
+    const elevFactory = new BuildingMeshFactory(sampler);
+    const building = makeBuilding();
+    const result = elevFactory.create([building], origin);
+    expect(result).toHaveLength(1);
+    // Position Y should be based on min elevation (100), not centroid
+    expect(result[0]!.position.y).toBeCloseTo(100, 0);
+  });
+
+  it('children use parent elevation, not their own', () => {
+    // Parent vertices at lat=50,60 → sampler returns 100 for lat 50
+    // Child vertices at lat=50,55 → sampler would return different values
+    const sampler = makeSampler((lat, _lng) => (lat <= 50 ? 50 : 200));
+    const elevFactory = new BuildingMeshFactory(sampler);
+
+    const child = makeBuilding({
+      id: 'child-1',
+      geometry: smallChildPolygon,
+      isPart: true,
+      parentId: 'parent-1',
+    });
+    const parent = makeBuilding({
+      id: 'parent-1',
+      isPart: false,
+      hasParts: true,
+      children: [child],
+    });
+    const result = elevFactory.create([parent, child], origin);
+    // Both should use parent's min elevation (50)
+    for (const mesh of result) {
+      expect(mesh.position.y).toBeCloseTo(50, 0);
+    }
   });
 });
