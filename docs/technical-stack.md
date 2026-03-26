@@ -87,7 +87,7 @@ This document records the key technology decisions made for the drone simulator 
 
 ## Testing Framework
 
-### Decision: Vitest 4.0
+### Decision: Vitest 4.1
 
 **Rationale:**
 - Vite-native test runner shares configuration (tsconfig.json, vite.config.ts), eliminating duplication
@@ -103,7 +103,7 @@ This document records the key technology decisions made for the drone simulator 
 
 ## DOM Implementation for Tests
 
-### Decision: happy-dom 20.6
+### Decision: happy-dom 20.8
 
 **Rationale:**
 - Lightweight implementation (~20× faster than jsdom) enables rapid test execution
@@ -113,6 +113,69 @@ This document records the key technology decisions made for the drone simulator 
 **Constraints Addressed:**
 - Not intended for pixel-perfect rendering tests; sufficient for logic-focused unit tests
 - Three.js canvas rendering excluded from test scope; covered by integration tests
+
+---
+
+## CSS Framework
+
+### Decision: Tailwind CSS 4.2
+
+**Rationale:**
+- Utility-first approach eliminates custom stylesheet maintenance and keeps styles co-located with markup
+- v4 uses a CSS-first config model — no `tailwind.config.js` required; configuration lives in the stylesheet
+- `@tailwindcss/vite` plugin integrates directly with the Vite build pipeline (no PostCSS config needed)
+
+**Constraints Addressed:**
+- SolidJS JSX templates use Tailwind classes directly; no CSS modules or styled-components needed
+- Works alongside the existing Vite 7 setup without additional configuration overhead
+
+---
+
+## Geospatial Libraries
+
+### Decision: Turf.js 7.3 + PMTiles 4.4 + Vector Tile Stack
+
+**Rationale:**
+
+**Turf.js (`@turf/*` — 10 modular packages):**
+- Modular geospatial math library; only the functions used are imported (tree-shakeable)
+- Covers area, bearing, centroid, distance, boolean containment, point grids, line slicing — all needed for GIS feature processing
+- Operates on standard GeoJSON; no custom format conversion
+
+**PMTiles 4.4:**
+- Single-file tile archive format that the browser can fetch range-requests against directly
+- Eliminates the need for a tile server; Overture Maps tiles are served as a static `.pmtiles` file
+- Native browser support with the `pmtiles` JS library
+
+**`@mapbox/vector-tile` 2.0 + `pbf` 4.0:**
+- Decode Mapbox Vector Tile (MVT) binary format extracted from the PMTiles archive
+- `pbf` handles Protocol Buffer deserialization; `@mapbox/vector-tile` wraps it with a GeoJSON-compatible API
+- Used in `ContextDataManager` / `OvertureParser` to convert raw tile bytes into feature geometries
+
+**Constraints Addressed:**
+- No tile server infrastructure required; all geospatial data is fetched client-side
+- Turf's modular imports keep bundle size minimal despite broad geospatial coverage
+
+---
+
+## UI Components
+
+### Decision: Kobalte 0.13 + solid-icons 1.2
+
+**Rationale:**
+
+**`@kobalte/core` 0.13:**
+- Accessible, unstyled SolidJS component primitives (Dialog, Popover, etc.)
+- Provides WAI-ARIA compliance out of the box without dictating visual design
+- Styled with Tailwind CSS classes; no style conflicts with the utility-first approach
+
+**`solid-icons` 1.2:**
+- Tree-shakeable icon set built for SolidJS; renders icons as optimized SVG components
+- Used in the Header and location search UI
+
+**Constraints Addressed:**
+- No React dependency; Kobalte and solid-icons are SolidJS-native
+- Zero runtime overhead for unused icons due to named imports
 
 ---
 
@@ -203,8 +266,11 @@ This document records the key technology decisions made for the drone simulator 
 | **Language** | TypeScript 5.9 | Static typing, strict mode, IDE support, type safety |
 | **Build** | Vite 7.3 | ESM-native, instant HMR, zero-config, optimized production output |
 | **Runtime & PM** | Bun | All-in-one tool, 25× faster, npm-compatible, native TS support |
-| **Testing** | Vitest 4.0 | Vite-native, Jest-compatible, shared config, fast execution |
-| **Test DOM** | happy-dom | Lightweight, fast, sufficient for logic testing |
+| **Testing** | Vitest 4.1 | Vite-native, Jest-compatible, shared config, fast execution |
+| **Test DOM** | happy-dom 20.8 | Lightweight, fast, sufficient for logic testing |
+| **CSS** | Tailwind CSS 4.2 | Utility-first, CSS-first config, Vite-native plugin |
+| **Geospatial** | Turf.js 7.3 + PMTiles 4.4 | Modular GIS math, serverless tile access, MVT decoding |
+| **UI Components** | Kobalte 0.13 + solid-icons 1.2 | Accessible SolidJS primitives, tree-shakeable icons |
 | **Linting** | ESLint 10.0 | TypeScript-aware, rule-based, auto-fix, flat config |
 | **Formatting** | Prettier 3.8 | Opinionated, minimal config, language-agnostic, IDE support |
 | **Modules** | ESM | Native browser support, tree-shakeable, modern ecosystem |

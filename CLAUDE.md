@@ -60,11 +60,16 @@ Full docs in `docs/`. See `docs/README.md` for the complete index.
 - `src/drone/` - Drone physics (GeoCoordinates {lat, lng}), DroneController (keyboard + mouse input); Drone emits `locationChanged`, `azimuthChanged`, `elevationChanged`, `movingChanged` via TypedEventEmitter
 - `src/gis/GeoCoordinates.ts` - Core geo math: `geoToLocal`, `getTileCoordinatesFromGeo`, `getTileGeoBounds`, `EARTH_RADIUS`
 - `src/gis/OriginManager.ts` - Holds drone position as Three.js origin; `onChange`/`offChange` callbacks let `TerrainObjectManager` and `MeshObjectManager` reposition existing tiles on each drone move
-- `src/data/` - ElevationDataManager (tile caching, z:x:y keys, AWS Terrarium PNG), ContextDataManager; `src/data/shared/tileLoaderUtils.ts` for cache-then-load pattern
+- `src/data/shared/TileDataManager.ts` - Abstract base class for tile-based data managers; owns ring management logic (`setLocation`, `initializeTileRing`, `updateTileRing`, `dispose`), emits `tileAdded`/`tileRemoved` events
+- `src/data/elevation/` - `ElevationDataManager` (tile caching, z:x:y keys, AWS Terrarium PNG), `ElevationDataTileLoader`, `ElevationDataTileParser`; `src/data/shared/tileLoaderUtils.ts` for cache-then-load pattern
+- `src/data/contextual/` - `ContextDataManager` (Overture Maps PMTiles), `OvertureParser`, `featureBoundsFilter`
+- `src/data/places/` - `interestingPlaces.ts`: curated landmark locations for the location search UI
 - `src/visualization/terrain/` - TerrainGeometryObjectManager + TerrainTextureObjectManager → TerrainObjectManager → TerrainObjectFactory → Three.js meshes (orchestrated pipeline)
-- `src/visualization/drone/DroneObject.ts` - Cone mesh representing the drone in the scene
+- `src/visualization/mesh/MeshObjectManager.ts` - Manages 3D mesh objects (buildings, vegetation, structures, barriers, bridges) per context tile; imports `registration.ts` to populate registry
+- `src/visualization/drone/DroneObject.ts` - Drone 3D model in scene
 - `src/visualization/TileObjectManager.ts` - Abstract base for all visual tile lifecycle managers; supports primary source + optional secondary rebuild sources
-- `src/features/` - Feature module registry (`registry.ts`): per-type canvas drawers and 3D mesh factories (buildings, vegetation, structures, barriers, roads, aeroways, water); dispatched by `TerrainCanvasRenderer` and `MeshObjectManager`
+- `src/features/registry.ts` + `registration.ts` - `registry.ts` is the singleton registry of feature modules; `registration.ts` imports and registers all modules (building, road, railway, water, aeroway, structure, barrier, vegetation, landuse, bridge); dispatched by `TerrainCanvasRenderer` and `MeshObjectManager`
+- `src/ui/` - SolidJS UI components: Header, LocationSearch (uses places data), PlacesModal, AttributionBar, Tooltip
 - `src/config.ts` - Centralized config: drone position/speed, camera chase distance/height, elevation zoom/ring/concurrency
 
 **Animation Frame Timing:** `AnimationLoop` (`src/drone/AnimationLoop.ts`) manages `requestAnimationFrame` timing and calls `drone.applyMove(deltaTime)` each frame. Subsequent data loading, mesh creation, and rendering are orchestrated via event subscriptions in `App.tsx` and triggered by drone movement—not controlled by AnimationLoop itself.
@@ -106,8 +111,5 @@ Z = south    → -(lat - origin.lat) × EARTH_RADIUS × π/180
 
 - Tests colocated with `.test.ts` suffix
 - Constructor injection: Pass mock constructor **classes** extending real Three.js classes
-- Example: Camera verifies call with `(75, width/height, 0.1, 1000)`
-- 3D Viewer: wrapper initialization & injection
-- Drone: physics, movement, geographic coordinate edge cases, controller cleanup
-- AnimationLoop: frame timing, delta time, integration
-- Terrain: geometry creation, tile sync, lifecycle
+- `fake-indexeddb` for IndexedDB testing (tile persistence caches)
+- happy-dom logs network errors from tile fetchers to stderr — these are noise, not real failures; a non-zero exit code from stderr alone can be ignored
