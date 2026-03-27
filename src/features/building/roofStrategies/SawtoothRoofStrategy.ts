@@ -1,13 +1,16 @@
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { BufferGeometry } from 'three';
 import type { IRoofGeometryStrategy, RoofParams } from './types';
-import { computeOBB } from './roofGeometryUtils';
+import {
+  computeOBB,
+  normalizeRing,
+  buildOutlineRoofGeometry,
+} from './roofGeometryUtils';
 
 /**
  * Sawtooth roof: N parallel skillion bays repeated across the building width.
- * Each bay has a slope face, a vertical face at the high edge, and two triangular end faces.
+ * Each bay has a slope rising from 0 to roofHeight across its width.
  *
- * N = clamp(floor(2*halfWidth / BAY_WIDTH_METERS), MIN_BAYS, MAX_BAYS)
- * 6 triangles per bay, 6N triangles total (non-indexed).
+ * Uses outline-based triangulation with a modular height function.
  */
 export class SawtoothRoofStrategy implements IRoofGeometryStrategy {
   private readonly BAY_WIDTH_METERS = 5;
@@ -15,12 +18,12 @@ export class SawtoothRoofStrategy implements IRoofGeometryStrategy {
   private readonly MAX_BAYS = 20;
 
   create(params: RoofParams): BufferGeometry {
-    const obb = computeOBB(params.outerRing);
+    const ring = params.outerRing;
     const h = params.roofHeight;
-    const hL = obb.halfLength;
-    const hW = obb.halfWidth;
+    const obb = computeOBB(ring);
+    const { count, isCCW } = normalizeRing(ring);
 
-    // Guard: degenerate thin building
+    const hW = obb.halfWidth;
     if (hW < 1e-3) return new BufferGeometry();
 
     const N = Math.min(
@@ -29,67 +32,41 @@ export class SawtoothRoofStrategy implements IRoofGeometryStrategy {
     );
     const bayWidth = (hW * 2) / N;
 
-    const cos = Math.cos(params.ridgeAngle);
-    const sin = Math.sin(params.ridgeAngle);
+    const acrossX = -Math.sin(params.ridgeAngle);
+    const acrossY = Math.cos(params.ridgeAngle);
 
-    // Along-ridge and across-ridge directions in Three.js XZ (X=mercX, Z=-mercY)
-    const aLX = cos;
-    const aLZ = -sin; // along-ridge
-    const aCX = -sin;
-    const aCZ = -cos; // across-ridge
-
-    const cx = obb.center[0];
-    const cz = -obb.center[1];
-
-    // 6 triangles × 3 vertices × 3 floats per bay
-    const positions = new Float32Array(6 * N * 9);
-    let o = 0;
-
-    type V3 = [number, number, number];
-    const emitTri = (v0: V3, v1: V3, v2: V3): void => {
-      positions[o++] = v0[0];
-      positions[o++] = v0[1];
-      positions[o++] = v0[2];
-      positions[o++] = v1[0];
-      positions[o++] = v1[1];
-      positions[o++] = v1[2];
-      positions[o++] = v2[0];
-      positions[o++] = v2[1];
-      positions[o++] = v2[2];
+    const computeHeight = (x: number, y: number): number => {
+      const proj = x * acrossX + y * acrossY;
+      // Map projection to position within bay (0..1)
+      const acrossPos = proj + hW; // 0..2*hW
+      const bayPos = ((acrossPos % bayWidth) + bayWidth) % bayWidth; // handle negatives
+      return h * (bayPos / bayWidth);
     };
 
-    for (let i = 0; i < N; i++) {
-      const a0 = -hW + i * bayWidth; // across scalar at low edge  (Y=0)
-      const a1 = -hW + (i + 1) * bayWidth; // across scalar at high edge (Y=h)
-
-      // Slope corners
-      const PLL: V3 = [cx + a0 * aCX + -hL * aLX, 0, cz + a0 * aCZ + -hL * aLZ];
-      const PLH: V3 = [cx + a0 * aCX + +hL * aLX, 0, cz + a0 * aCZ + +hL * aLZ];
-      const PHL: V3 = [cx + a1 * aCX + -hL * aLX, h, cz + a1 * aCZ + -hL * aLZ];
-      const PHH: V3 = [cx + a1 * aCX + +hL * aLX, h, cz + a1 * aCZ + +hL * aLZ];
-
-      // Vertical face base corners (same XZ as PHL/PHH, Y=0)
-      const VLL: V3 = [PHL[0], 0, PHL[2]];
-      const VLH: V3 = [PHH[0], 0, PHH[2]];
-
-      // Slope face (normal: upward + toward -across)
-      emitTri(PLL, PLH, PHL);
-      emitTri(PLH, PHH, PHL);
-
-      // Vertical face (normal: toward +across)
-      emitTri(PHL, PHH, VLL);
-      emitTri(VLL, PHH, VLH);
-
-      // End face at -halfLength (normal: toward -along)
-      emitTri(PLL, PHL, VLL);
-
-      // End face at +halfLength (normal: toward +along)
-      emitTri(PLH, VLH, PHH);
+    const heights = new Float64Array(count);
+    for (let i = 0; i < count; i++) {
+      heights[i] = computeHeight(ring[i]![0], ring[i]![1]);
     }
 
-    const geom = new BufferGeometry();
-    geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
-    geom.computeVertexNormals();
-    return geom;
+    let innerHeights: Float64Array[] | undefined;
+    if (params.innerRings) {
+      innerHeights = params.innerRings.map((inner) => {
+        const { count: hCount } = normalizeRing(inner);
+        const hArr = new Float64Array(hCount);
+        for (let i = 0; i < hCount; i++) {
+          hArr[i] = computeHeight(inner[i]![0], inner[i]![1]);
+        }
+        return hArr;
+      });
+    }
+
+    return buildOutlineRoofGeometry(
+      ring,
+      heights,
+      isCCW,
+      count,
+      params.innerRings,
+      innerHeights
+    );
   }
 }

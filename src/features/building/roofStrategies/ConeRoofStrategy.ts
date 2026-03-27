@@ -30,7 +30,7 @@ export class ConeRoofStrategy implements IRoofGeometryStrategy {
 
       if (sinTheta < 0.001) {
         // Apex vertex
-        pos.setXYZ(i, obb.center[0], h, -obb.center[1]);
+        pos.setXYZ(i, 0, h, 0);
         continue;
       }
 
@@ -40,9 +40,9 @@ export class ConeRoofStrategy implements IRoofGeometryStrategy {
 
       pos.setXYZ(
         i,
-        rAtHeight * Math.cos(theta) + obb.center[0],
+        rAtHeight * Math.cos(theta),
         y * h,
-        rAtHeight * Math.sin(theta) - obb.center[1]
+        rAtHeight * Math.sin(theta)
       );
     }
 

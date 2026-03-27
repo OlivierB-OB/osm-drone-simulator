@@ -1,6 +1,6 @@
 import { BufferGeometry, SphereGeometry } from 'three';
 import type { IRoofGeometryStrategy, RoofParams } from './types';
-import { computeOBB, polygonExtentAtAngle } from './roofGeometryUtils';
+import { polygonExtentAtAngle } from './roofGeometryUtils';
 
 export class OnionRoofStrategy implements IRoofGeometryStrategy {
   create(params: RoofParams): BufferGeometry {
@@ -34,11 +34,6 @@ export class OnionRoofStrategy implements IRoofGeometryStrategy {
       pos.setXYZ(i, Math.cos(theta) * finalR, y * h, Math.sin(theta) * finalR);
     }
     pos.needsUpdate = true;
-
-    // Translate base center to OBB center (ring is centroid-relative)
-    const obb = computeOBB(ring);
-    geom.translate(obb.center[0], 0, -obb.center[1]);
-
     geom.computeVertexNormals();
     return geom;
   }

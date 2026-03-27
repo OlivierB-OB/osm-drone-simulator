@@ -1,3 +1,9 @@
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  ShapeUtils,
+  Vector2,
+} from 'three';
 import type { OBB } from './types';
 
 /**
@@ -146,4 +152,162 @@ export function polygonExtentAtAngle(
     Math.pow(obb.halfLength * Math.cos(localTheta), 2) +
       Math.pow(obb.halfWidth * Math.sin(localTheta), 2)
   );
+}
+
+/**
+ * Normalizes a polygon ring: detects closed-ring (last==first) and winding
+ * direction (CCW vs CW via shoelace formula).
+ */
+export function normalizeRing(ring: [number, number][]): {
+  count: number;
+  isCCW: boolean;
+} {
+  const isClosedRing =
+    ring.length > 1 &&
+    ring[0]![0] === ring[ring.length - 1]![0] &&
+    ring[0]![1] === ring[ring.length - 1]![1];
+  const count = isClosedRing ? ring.length - 1 : ring.length;
+
+  let signedArea = 0;
+  for (let i = 0; i < count; i++) {
+    const j = (i + 1) % count;
+    signedArea += ring[i]![0] * ring[j]![1] - ring[j]![0] * ring[i]![1];
+  }
+  return { count, isCCW: signedArea > 0 };
+}
+
+/**
+ * Converts ring vertices to Vector2 contour and inner rings to Vector2 holes
+ * for use with ShapeUtils.triangulateShape.
+ */
+export function prepareContourAndHoles(
+  ring: [number, number][],
+  count: number,
+  innerRings?: [number, number][][]
+): { contour: Vector2[]; holes: Vector2[][] } {
+  const contour: Vector2[] = [];
+  for (let i = 0; i < count; i++) {
+    contour.push(new Vector2(ring[i]![0], ring[i]![1]));
+  }
+  const holes: Vector2[][] = [];
+  if (innerRings) {
+    for (const inner of innerRings) {
+      const { count: hCount } = normalizeRing(inner);
+      const hole: Vector2[] = [];
+      for (let i = 0; i < hCount; i++) {
+        hole.push(new Vector2(inner[i]![0], inner[i]![1]));
+      }
+      holes.push(hole);
+    }
+  }
+  return { contour, holes };
+}
+
+/**
+ * Builds a complete roof BufferGeometry from an outline ring, per-vertex heights,
+ * and optional inner rings (holes). Handles triangulation, top face, and side walls.
+ *
+ * This is the shared implementation pattern used by all outline-based roof strategies.
+ * Each strategy only needs to compute the `heights` array.
+ */
+export function buildOutlineRoofGeometry(
+  ring: [number, number][],
+  heights: Float64Array,
+  isCCW: boolean,
+  count: number,
+  innerRings?: [number, number][][],
+  innerHeights?: Float64Array[]
+): BufferGeometry {
+  const { contour, holes } = prepareContourAndHoles(ring, count, innerRings);
+  const triangles = ShapeUtils.triangulateShape(contour, holes);
+
+  // Collect all rings and their heights for wall generation
+  const allRings: { ring: [number, number][]; heights: Float64Array; count: number; isInner: boolean }[] = [
+    { ring, heights, count, isInner: false },
+  ];
+  if (innerRings && innerHeights) {
+    for (let r = 0; r < innerRings.length; r++) {
+      const { count: hCount } = normalizeRing(innerRings[r]!);
+      allRings.push({
+        ring: innerRings[r]!,
+        heights: innerHeights[r]!,
+        count: hCount,
+        isInner: true,
+      });
+    }
+  }
+
+  // Build combined vertex array for contour + holes (for triangle index lookup)
+  const allVertices: [number, number][] = [];
+  const allHeightValues: number[] = [];
+  for (let i = 0; i < count; i++) {
+    allVertices.push(ring[i]!);
+    allHeightValues.push(heights[i]!);
+  }
+  if (innerRings && innerHeights) {
+    for (let r = 0; r < innerRings.length; r++) {
+      const { count: hCount } = normalizeRing(innerRings[r]!);
+      for (let i = 0; i < hCount; i++) {
+        allVertices.push(innerRings[r]![i]!);
+        allHeightValues.push(innerHeights[r]![i]!);
+      }
+    }
+  }
+
+  // Count triangles
+  const topTriCount = triangles.length;
+  let sideTriCount = 0;
+  for (const entry of allRings) sideTriCount += entry.count * 2;
+  const totalVertices = (topTriCount + sideTriCount) * 3;
+  const positions = new Float32Array(totalVertices * 3);
+  let o = 0;
+
+  // Top face
+  for (const tri of triangles) {
+    for (const idx of tri) {
+      const v = allVertices[idx]!;
+      const h = allHeightValues[idx]!;
+      positions[o++] = v[0];
+      positions[o++] = h;
+      positions[o++] = -v[1];
+    }
+  }
+
+  // Side walls for each ring
+  for (const entry of allRings) {
+    // Inner rings have opposite winding for outward-facing normals
+    const outward = entry.isInner ? !isCCW : isCCW;
+    for (let i = 0; i < entry.count; i++) {
+      const j = (i + 1) % entry.count;
+      const a = outward ? i : j;
+      const b = outward ? j : i;
+
+      // Triangle 1: base[a] → base[b] → roof[b]
+      positions[o++] = entry.ring[a]![0];
+      positions[o++] = 0;
+      positions[o++] = -entry.ring[a]![1];
+      positions[o++] = entry.ring[b]![0];
+      positions[o++] = 0;
+      positions[o++] = -entry.ring[b]![1];
+      positions[o++] = entry.ring[b]![0];
+      positions[o++] = entry.heights[b]!;
+      positions[o++] = -entry.ring[b]![1];
+
+      // Triangle 2: base[a] → roof[b] → roof[a]
+      positions[o++] = entry.ring[a]![0];
+      positions[o++] = 0;
+      positions[o++] = -entry.ring[a]![1];
+      positions[o++] = entry.ring[b]![0];
+      positions[o++] = entry.heights[b]!;
+      positions[o++] = -entry.ring[b]![1];
+      positions[o++] = entry.ring[a]![0];
+      positions[o++] = entry.heights[a]!;
+      positions[o++] = -entry.ring[a]![1];
+    }
+  }
+
+  const geom = new BufferGeometry();
+  geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geom.computeVertexNormals();
+  return geom;
 }

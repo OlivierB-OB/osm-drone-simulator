@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ShapeUtils, Vector2 } from 'three';
 import { GambrelRoofStrategy } from './GambrelRoofStrategy';
 
 // 10×6 rectangle, centred at origin (CCW)
@@ -11,6 +12,23 @@ const rect: [number, number][] = [
 
 // Closed ring variant
 const rectClosed: [number, number][] = [...rect, rect[0]!];
+
+// Hexagon with vertices on and off the ridge line
+const hexRing: [number, number][] = [
+  [-5, -3],
+  [5, -3],
+  [5, 0], // ridge vertex
+  [5, 3],
+  [-5, 3],
+  [-5, 0], // ridge vertex
+];
+
+function expectedFloatCount(ring: [number, number][]): number {
+  const contour = ring.map(([x, y]) => new Vector2(x, y));
+  const topTriCount = ShapeUtils.triangulateShape(contour, []).length;
+  const sideTriCount = ring.length * 2;
+  return (topTriCount + sideTriCount) * 3 * 3;
+}
 
 const strategy = new GambrelRoofStrategy();
 const baseParams = {
@@ -27,9 +45,11 @@ describe('GambrelRoofStrategy', () => {
     expect(geom.attributes.position).toBeDefined();
   });
 
-  it('produces 126 floats (14 triangles × 3 vertices × 3 floats)', () => {
+  it('produces correct vertex count for outline-based geometry', () => {
     const geom = strategy.create(baseParams);
-    expect(geom.attributes.position!.array.length).toBe(126);
+    expect(geom.attributes.position!.array.length).toBe(
+      expectedFloatCount(rect)
+    );
   });
 
   it('is non-indexed geometry', () => {
@@ -46,14 +66,13 @@ describe('GambrelRoofStrategy', () => {
     }
   });
 
-  it('has exactly 3 distinct Y levels (0, breakHeight, roofHeight)', () => {
-    const geom = strategy.create(baseParams);
+  it('ridge vertex reaches roofHeight', () => {
+    // Use hexagon which has vertices on the ridge centreline
+    const geom = strategy.create({ ...baseParams, outerRing: hexRing });
     const pos = geom.attributes.position!;
-    const ys = new Set<number>();
-    for (let i = 0; i < pos.count; i++) {
-      ys.add(Math.round(pos.getY(i) * 1000) / 1000);
-    }
-    expect(ys.size).toBe(3);
+    let maxY = -Infinity;
+    for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
+    expect(maxY).toBeCloseTo(baseParams.roofHeight, 1);
   });
 
   it('base is at Y=0', () => {
@@ -62,14 +81,6 @@ describe('GambrelRoofStrategy', () => {
     let minY = Infinity;
     for (let i = 0; i < pos.count; i++) minY = Math.min(minY, pos.getY(i));
     expect(minY).toBeCloseTo(0, 5);
-  });
-
-  it('apex is at Y=roofHeight', () => {
-    const geom = strategy.create(baseParams);
-    const pos = geom.attributes.position!;
-    let maxY = -Infinity;
-    for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
-    expect(maxY).toBeCloseTo(baseParams.roofHeight, 5);
   });
 
   it('has upward-facing faces (top surface normals with positive Y)', () => {

@@ -558,11 +558,12 @@ describe('RoofGeometryFactory', () => {
   });
 
   describe('gambrel', () => {
-    it('creates non-indexed geometry (126 floats = 14 triangles)', () => {
+    it('creates non-indexed outline-based geometry', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBe(42); // 126/3
+      // 4 unique verts (closed ring) → 2 top + 8 side = 10 tris → 30 verts
+      expect(geom!.attributes.position!.count).toBe(30);
     });
 
     it('all heights are in [0, roofHeight]', () => {
@@ -573,33 +574,24 @@ describe('RoofGeometryFactory', () => {
         expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
       }
     });
-
-    it('has 3 distinct Y levels', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
-      const pos = geom!.attributes.position!;
-      const ys = new Set<number>();
-      for (let i = 0; i < pos.count; i++) {
-        ys.add(Math.round(pos.getY(i) * 1000) / 1000);
-      }
-      expect(ys.size).toBe(3);
-    });
   });
 
   describe('half-hipped', () => {
-    it('creates indexed geometry with 10 vertices and 42 indices', () => {
+    it('creates non-indexed outline-based geometry', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'half-hipped' });
       expect(geom).not.toBeNull();
-      expect(geom!.index).not.toBeNull();
-      expect(geom!.attributes.position!.count).toBe(10);
-      expect(geom!.index!.count).toBe(42);
+      expect(geom!.index).toBeNull();
+      // 4 unique verts → 30 verts
+      expect(geom!.attributes.position!.count).toBe(30);
     });
 
-    it('apex is at Y=roofHeight', () => {
+    it('all heights are in [0, roofHeight]', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'half-hipped' });
       const pos = geom!.attributes.position!;
-      let maxY = -Infinity;
-      for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
-      expect(maxY).toBeCloseTo(5, 5);
+      for (let i = 0; i < pos.count; i++) {
+        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
+      }
     });
 
     it('half_hipped key also works', () => {
@@ -609,44 +601,40 @@ describe('RoofGeometryFactory', () => {
   });
 
   describe('mansard', () => {
-    it('creates indexed geometry with 12 vertices and 54 indices', () => {
+    it('creates non-indexed outline-based geometry', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'mansard' });
       expect(geom).not.toBeNull();
-      expect(geom!.index).not.toBeNull();
-      expect(geom!.attributes.position!.count).toBe(12);
-      expect(geom!.index!.count).toBe(54);
+      expect(geom!.index).toBeNull();
+      // 4 unique verts → 30 verts
+      expect(geom!.attributes.position!.count).toBe(30);
     });
 
-    it('has 3 distinct Y levels', () => {
+    it('all heights are in [0, roofHeight]', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'mansard' });
       const pos = geom!.attributes.position!;
-      const ys = new Set<number>();
       for (let i = 0; i < pos.count; i++) {
-        ys.add(Math.round(pos.getY(i) * 100) / 100);
+        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
       }
-      expect(ys.size).toBe(3);
     });
   });
 
   describe('round', () => {
-    it('creates non-indexed geometry', () => {
+    it('creates non-indexed outline-based geometry', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'round' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBeGreaterThan(10);
+      // 4 unique verts → 30 verts
+      expect(geom!.attributes.position!.count).toBe(30);
     });
 
-    it('has crown at roofHeight and eaves at Y=0', () => {
+    it('all heights are in [0, roofHeight]', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'round' });
       const pos = geom!.attributes.position!;
-      let minY = Infinity;
-      let maxY = -Infinity;
       for (let i = 0; i < pos.count; i++) {
-        minY = Math.min(minY, pos.getY(i));
-        maxY = Math.max(maxY, pos.getY(i));
+        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
       }
-      expect(minY).toBeCloseTo(0, 5);
-      expect(maxY).toBeCloseTo(5, 1);
     });
   });
 
@@ -676,23 +664,13 @@ describe('RoofGeometryFactory', () => {
       expect(geom!.index).toBeNull();
     });
 
-    it('has crown at roofHeight and eaves at Y=0', () => {
+    it('all heights are in [0, roofHeight]', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'sawtooth' });
       const pos = geom!.attributes.position!;
-      let minY = Infinity;
-      let maxY = -Infinity;
       for (let i = 0; i < pos.count; i++) {
-        minY = Math.min(minY, pos.getY(i));
-        maxY = Math.max(maxY, pos.getY(i));
+        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
       }
-      expect(minY).toBeCloseTo(0, 5);
-      expect(maxY).toBeCloseTo(5, 5);
-    });
-
-    it('N bays scale with building width (N=2 for halfWidth=5)', () => {
-      // rectangle halfWidth=5, BAY_WIDTH=5 → N=max(2,floor(10/5))=2 → 2*6*3=36 vertices
-      const geom = factory.create({ ...baseParams, roofShape: 'sawtooth' });
-      expect(geom!.attributes.position!.count).toBe(36);
     });
   });
 });

@@ -39,6 +39,10 @@ const PITCHED_SHAPES = new Set([
   'saltbox',
   'gambrel',
   'mansard',
+  'crosspitched',
+  'butterfly',
+  'round',
+  'sawtooth',
 ]);
 
 /**
@@ -131,10 +135,21 @@ export class BuildingMeshFactory {
       const cosLat = Math.cos(centerLat * TO_RAD);
 
       // Build local ring: convert degree offsets to meters
-      const localRing: [number, number][] = outerRing.map((pt) => [
+      const toLocal = (pt: [number, number]): [number, number] => [
         (pt[0] - centerLng) * TO_RAD * EARTH_RADIUS * cosLat,
         (pt[1] - centerLat) * TO_RAD * EARTH_RADIUS,
-      ]);
+      ];
+      const localRing: [number, number][] = outerRing.map(toLocal);
+
+      // Convert inner rings to local coords (for roof strategies)
+      const localInnerRings: [number, number][][] = [];
+      for (let r = 1; r < polygon.coordinates.length; r++) {
+        const innerRing = polygon.coordinates[r];
+        if (!innerRing || innerRing.length < 4) continue;
+        localInnerRings.push(
+          (innerRing as [number, number][]).map(toLocal)
+        );
+      }
 
       // Resolve heights
       const totalHeight = this.resolveHeight(building);
@@ -164,21 +179,11 @@ export class BuildingMeshFactory {
       }
 
       // Add holes from inner rings
-      for (let r = 1; r < polygon.coordinates.length; r++) {
-        const innerRing = polygon.coordinates[r];
-        if (!innerRing || innerRing.length < 4) continue;
+      for (const localInner of localInnerRings) {
         const hole = new Path();
-        const hFirst = innerRing[0] as [number, number];
-        hole.moveTo(
-          (hFirst[0] - centerLng) * TO_RAD * EARTH_RADIUS * cosLat,
-          (hFirst[1] - centerLat) * TO_RAD * EARTH_RADIUS
-        );
-        for (let i = 1; i < innerRing.length; i++) {
-          const pt = innerRing[i] as [number, number];
-          hole.lineTo(
-            (pt[0] - centerLng) * TO_RAD * EARTH_RADIUS * cosLat,
-            (pt[1] - centerLat) * TO_RAD * EARTH_RADIUS
-          );
+        hole.moveTo(localInner[0]![0], localInner[0]![1]);
+        for (let i = 1; i < localInner.length; i++) {
+          hole.lineTo(localInner[i]![0], localInner[i]![1]);
         }
         shape.holes.push(hole);
       }
@@ -224,6 +229,8 @@ export class BuildingMeshFactory {
         }
         const roofGeom = this.roofFactory.create({
           outerRing: localRing,
+          innerRings:
+            localInnerRings.length > 0 ? localInnerRings : undefined,
           roofShape,
           roofHeight,
           ridgeAngle,

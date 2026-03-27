@@ -9,6 +9,7 @@ export interface OBB {
 
 export interface RoofParams {
   outerRing: [number, number][]; // local Mercator coords (relative to centroid)
+  innerRings?: [number, number][][]; // inner rings (holes/courtyards) in same coords
   roofShape: string;
   roofHeight: number; // meters
   ridgeAngle: number; // radians in local Mercator XY plane

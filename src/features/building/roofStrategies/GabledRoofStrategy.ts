@@ -1,126 +1,57 @@
-import {
-  BufferGeometry,
-  Float32BufferAttribute,
-  ShapeUtils,
-  Vector2,
-} from 'three';
+import type { BufferGeometry } from 'three';
 import type { IRoofGeometryStrategy, RoofParams } from './types';
+import { normalizeRing, buildOutlineRoofGeometry } from './roofGeometryUtils';
 
 export class GabledRoofStrategy implements IRoofGeometryStrategy {
   create(params: RoofParams): BufferGeometry {
     const ring = params.outerRing;
     const h = params.roofHeight;
+    const { count, isCCW } = normalizeRing(ring);
 
-    // --- Step 1: Normalise ring ---
-    const isClosedRing =
-      ring.length > 1 &&
-      ring[0]![0] === ring[ring.length - 1]![0] &&
-      ring[0]![1] === ring[ring.length - 1]![1];
-    const count = isClosedRing ? ring.length - 1 : ring.length;
-
-    // Detect ring orientation via shoelace (signed area).
-    // Positive = CCW (standard math), Negative = CW.
-    let signedArea = 0;
-    for (let i = 0; i < count; i++) {
-      const j = (i + 1) % count;
-      signedArea += ring[i]![0] * ring[j]![1] - ring[j]![0] * ring[i]![1];
-    }
-    const isCCW = signedArea > 0;
-
-    // --- Step 2: Across-ridge axis and projections ---
-    // ridgeAngle: CCW radians from +X in local Mercator XY
-    // acrossX/acrossY: perpendicular-to-ridge direction (the slope direction)
+    // Across-ridge axis (perpendicular to ridge direction)
     const acrossX = -Math.sin(params.ridgeAngle);
     const acrossY = Math.cos(params.ridgeAngle);
 
-    const acrossProj = new Float64Array(count);
+    // Project vertices onto across-ridge axis
     let maxAbsAcross = 0;
+    const acrossProj = new Float64Array(count);
     for (let i = 0; i < count; i++) {
       const p = ring[i]![0] * acrossX + ring[i]![1] * acrossY;
       acrossProj[i] = p;
       if (Math.abs(p) > maxAbsAcross) maxAbsAcross = Math.abs(p);
     }
 
-    // --- Step 3: Per-vertex roof height ---
-    // Vertices closest to the ridge centreline (acrossProj ≈ 0) reach roofHeight.
-    // Vertices at the maximum across-projection reach Y = 0 (eave level).
-    const roofY = new Float64Array(count);
+    // Per-vertex height: max at ridge centreline, zero at eaves
+    const heights = new Float64Array(count);
     if (maxAbsAcross > 1e-6) {
       for (let i = 0; i < count; i++) {
-        roofY[i] = h * (1 - Math.abs(acrossProj[i]!) / maxAbsAcross);
+        heights[i] = h * (1 - Math.abs(acrossProj[i]!) / maxAbsAcross);
       }
     }
-    // If maxAbsAcross <= 1e-6 (degenerate flat/line polygon): all roofY remain 0.
 
-    // --- Step 4: Triangulate top face ---
-    const contour: Vector2[] = [];
-    for (let i = 0; i < count; i++) {
-      contour.push(new Vector2(ring[i]![0], ring[i]![1]));
-    }
-    const triangles = ShapeUtils.triangulateShape(contour, []);
-
-    // --- Allocate position buffer (non-indexed, flat normals) ---
-    const topTriCount = triangles.length;
-    const sideTriCount = count * 2;
-    const totalVertices = (topTriCount + sideTriCount) * 3;
-    const positions = new Float32Array(totalVertices * 3);
-    let o = 0;
-
-    // --- Step 5a: Top face ---
-    // ShapeUtils.triangulateShape normalises to CCW winding internally.
-    // CCW Mercator + Z=-mercY preserves upward-facing normals after computeVertexNormals().
-    for (const tri of triangles) {
-      const i0 = tri[0]!;
-      const i1 = tri[1]!;
-      const i2 = tri[2]!;
-      // Three.js: X = mercX, Y = height, Z = -mercY
-      positions[o++] = ring[i0]![0];
-      positions[o++] = roofY[i0]!;
-      positions[o++] = -ring[i0]![1];
-      positions[o++] = ring[i1]![0];
-      positions[o++] = roofY[i1]!;
-      positions[o++] = -ring[i1]![1];
-      positions[o++] = ring[i2]![0];
-      positions[o++] = roofY[i2]!;
-      positions[o++] = -ring[i2]![1];
+    // Compute inner ring heights with same formula
+    let innerHeights: Float64Array[] | undefined;
+    if (params.innerRings) {
+      innerHeights = params.innerRings.map((inner) => {
+        const { count: hCount } = normalizeRing(inner);
+        const hArr = new Float64Array(hCount);
+        if (maxAbsAcross > 1e-6) {
+          for (let i = 0; i < hCount; i++) {
+            const p = inner[i]![0] * acrossX + inner[i]![1] * acrossY;
+            hArr[i] = h * (1 - Math.abs(p) / maxAbsAcross);
+          }
+        }
+        return hArr;
+      });
     }
 
-    // --- Step 5b: Side walls ---
-    // Fill the gap between the flat wall top (Y=0) and the sloped roof surface.
-    // Winding: Z=-mercY reverses handedness. For CCW polygon, edge (i,j) gives outward
-    // normals; for CW, swap to (j,i). Same convention as SkillionRoofStrategy.
-    for (let i = 0; i < count; i++) {
-      const j = (i + 1) % count;
-      const a = isCCW ? i : j;
-      const b = isCCW ? j : i;
-
-      // Triangle 1: base[a] → base[b] → roof[b]
-      positions[o++] = ring[a]![0];
-      positions[o++] = 0;
-      positions[o++] = -ring[a]![1];
-      positions[o++] = ring[b]![0];
-      positions[o++] = 0;
-      positions[o++] = -ring[b]![1];
-      positions[o++] = ring[b]![0];
-      positions[o++] = roofY[b]!;
-      positions[o++] = -ring[b]![1];
-
-      // Triangle 2: base[a] → roof[b] → roof[a]
-      positions[o++] = ring[a]![0];
-      positions[o++] = 0;
-      positions[o++] = -ring[a]![1];
-      positions[o++] = ring[b]![0];
-      positions[o++] = roofY[b]!;
-      positions[o++] = -ring[b]![1];
-      positions[o++] = ring[a]![0];
-      positions[o++] = roofY[a]!;
-      positions[o++] = -ring[a]![1];
-    }
-
-    // --- Step 6: Build geometry ---
-    const geom = new BufferGeometry();
-    geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
-    geom.computeVertexNormals();
-    return geom;
+    return buildOutlineRoofGeometry(
+      ring,
+      heights,
+      isCCW,
+      count,
+      params.innerRings,
+      innerHeights
+    );
   }
 }
