@@ -11,41 +11,60 @@ Buildings appear as 3D extruded structures with vertical walls and roofs. They r
 
 ## Data Sources
 
-Buildings are identified by Overture fields:
-- `building=*` (type: house, residential, commercial, office, etc.)
-- `height` or `building:levels` (determines wall height)
-- `roof:shape` (flat, gabled, hipped, half-hipped, pyramidal, gambrel, mansard, dome, onion, cone, skillion, butterfly, crosspitched, round, saltbox, sawtooth)
-- `roof:direction` or `roof:orientation` (angles for pitched roofs)
-- `roof:height` (proportion of roof above walls, defaults to 30% of building width)
-- `building:min_level` (height offset for buildings on slopes)
-- `building:material` (brick, concrete, glass, stone, wood, etc.) — overrides type-based color
-- `roof:material` (tiles, slate, metal, copper, grass, thatch, etc.) — overrides default roof color
-- `roof:colour` (explicit RGB override)
+Buildings are identified by Overture Maps fields (flat underscore naming):
+- `class` (building type: house, residential, commercial, office, etc.)
+- `height` (meters) or `num_floors` (determines wall height; 1 floor ≈ 3m)
+- `min_height` (height offset above terrain for building parts on slopes)
+- `roof_shape` (flat, gabled, hipped, half_hipped, pyramidal, gambrel, mansard, dome, onion, round, skillion, saltbox)
+- `roof_direction` (compass bearing in degrees, 0°=North, clockwise) — slope/ridge orientation
+- `roof_orientation` (`along` or `across` — ridge parallel or perpendicular to longest wall)
+- `roof_height` (vertical rise of the roof above wall top, in meters)
+- `facade_color` (explicit wall color override, hex)
+- `facade_material` (brick, concrete, glass, stone, wood, etc.) — overrides type-based color
+- `roof_material` (tiles, slate, metal, copper, grass, thatch, etc.) — overrides default roof color
+- `roof_color` (explicit roof color override, hex)
+- `has_parts` (boolean — building contains child `building_part` features)
+
+> OSM-style colon tags (`roof:shape`, `building:levels`, `roof:direction`, etc.) are also supported via a secondary parser used for OSM-sourced data.
 
 ## Rendering Strategy
 
 1. **Geometry Creation**: Three.js `ExtrudeGeometry` extrudes a 2D polygon outline vertically to create walls
    - Outer ring defines building footprint
    - Inner rings define courtyard holes (cutouts)
-2. **Local Coordinate Space**: Geometry built relative to polygon centroid to preserve precision at large Mercator coordinates
-3. **Wall Height**: Resolved from height tag, levels × 3m, or type-specific defaults
+2. **Local Coordinate Space**: Geometry built relative to polygon centroid to preserve precision at large coordinates
+3. **Wall Height**: Resolved from `height` tag → `num_floors × 3m + 1m` → type-specific defaults → 6m fallback
 4. **Roof Handling**:
-   - **Flat roofs**: Top cap of wall extrusion uses roof color
-   - **Pitched roofs**: Separate `RoofGeometryFactory` generates ridge geometry based on shape and orientation; meshes grouped together
-     - **Gabled / Hipped**: Per-vertex height assigned via projection onto OBB axes; actual polygon ring triangulated with `ShapeUtils.triangulateShape` (preserves L-shapes, T-shapes, etc.); side walls fill the gap between flat wall top and sloped surface. Hipped additionally tapers height toward each hip end via a second along-axis projection.
-     - **Pyramidal**: One triangular face per building edge converging at apex; used directly for pyramidal shape and as fallback for near-square hipped/gabled footprints.
-     - **Skillion**: Single sloped plane; per-vertex height gradient from low eave to high eave across the ridge direction.
-     - **Butterfly**: V-shaped valley roof; eaves are the highest points and the central valley runs at wall-top level. Height formula is the arithmetic complement of gabled: `h × |acrossProj| / maxAbsAcross`.
-     - **Dome**: Unit upper hemisphere (`SphereGeometry`, 32×16 segments) with per-vertex angular fitting via `polygonExtentAtAngle` — each latitude ring scales to the polygon's extent in that compass direction, so the base conforms to the actual footprint. `ridgeAngle` is not used.
-     - **Onion**: Unit upper hemisphere (`SphereGeometry`, 32×16 segments) with per-vertex angular fitting via `polygonExtentAtAngle` — identical approach to dome but with an onion bulge profile applied before footprint fitting: `finalR = extent × taper × bulge × sinPhi` where `bulge = 1 + 0.35×sin(t×π)` and `taper = 1 − 0.2×t` (widest at ~50% height, narrower toward apex). `ridgeAngle` is not used.
-     - **Cone**: Two-case algorithm — circular footprints (eccentricity < 1.2) use `ConeGeometry` (64 segments) with per-vertex angular fitting via `polygonExtentAtAngle`, linearly tapering each base vertex toward the apex; elongated footprints (eccentricity ≥ 1.2) delegate to `PyramidalRoofStrategy`.
-     - **Crosspitched**: Upper envelope of two perpendicular gabled profiles (`max(h1, h2)`); per-vertex height automatically produces valley lines at the intersection of the two sloping planes; equal-pitch variant uses `min(halfLength, halfWidth)` as the shared eave half-width for both ridges.
-     - **Gambrel**: Barn-style two-zone slope per side of the ridge; steep lower section rises from the eave to a break line at 50% of roof height and 60% of OBB half-width, then a shallower upper section continues to the ridge. OBB-based: 4 base corners, 4 knee points at the break line, 2 ridge endpoints → 14 triangles, non-indexed.
-     - **Half-hipped (Jerkinhead)**: Gabled roof with the top portion of each gable end clipped by a small hip triangle. Ridge runs the full building length (same as gabled). Each gable end has a vertical rectangular section from the base to `hipH = 0.3 × roofHeight`, then a sloped hip triangle from `hipH` up to the ridge endpoint. OBB-based: 4 base corners + 2 ridge endpoints + 4 hip points → 10 vertices, 14 triangles, indexed geometry.
-     - **Mansard**: Four-sided roof with two slopes per side — steep lower section rising from the base to a break line, then a shallow upper section continuing to a flat top platform. The four-sided analog of gambrel. Three OBB rings at progressive heights (base → break → top): 12 vertices, 18 triangles, indexed geometry. `breakHeight = 60%` of roof height; `breakInset = 40%` of OBB halfWidth; `topInset = 15%` of halfWidth. Falls back to PyramidalRoofStrategy if the break inset collapses the ring (very narrow buildings).
-     - **Round**: Barrel-vault semi-cylinder extruded along the ridge axis. Cross-section is a semi-ellipse: `across(φ) = halfWidth·cos(φ)`, `height(φ) = roofHeight·sin(φ)`, φ ∈ [0, π], N=24 arc segments. The OBB long axis becomes the extrusion axis (ridge direction); if the footprint is wider than long, axes are swapped by rotating `ridgeAngle` by π/2. Geometry: N curved strip quads + 2 semicircular end-cap fans = 4N triangles, non-indexed.
-     - **Saltbox**: Asymmetric gabled roof with the ridge displaced toward one eave by `ridgeOffset = halfWidth × 0.3` (clamped to 90% of halfWidth). Each vertex is projected onto the across-ridge axis; vertices on the short steep side use `h × max(0, 1 − (proj − ridgeOffset) / halfWidthShort)` and vertices on the long gentle side use `h × max(0, 1 − (ridgeOffset − proj) / halfWidthLong)`. Per-vertex approach with `ShapeUtils.triangulateShape` handles arbitrary footprints; side walls fill the gap as in gabled.
-     - **Sawtooth**: N parallel skillion bays repeated across the building width. Each bay rises from a low eave (Y=0) to a high eave (Y=roofHeight) across the ridge direction, then drops abruptly via a vertical face back to Y=0 for the next bay. N = clamp(floor(2×halfWidth / 5m), 2, 20); bay count scales automatically with building width. All slopes face the same direction (controlled by `roof:direction`). OBB-based: 4 slope corners + 2 vertical-face base corners per bay → 6 triangles per bay, 6N triangles total, non-indexed.
+   - **Flat roofs**: Top cap of wall extrusion uses roof color; triangulated with earcut (no holes) or CDT (holes)
+   - **Pitched roofs**: `RoofGeometryFactory` delegates to one of 11 `IRoofGeometryStrategy` implementations; the resulting mesh is grouped with the wall mesh
+
+### Core Algorithms
+
+Three computational geometry algorithms underpin the roof strategies:
+
+- **Straight Skeleton** (`straight-skeleton` npm package): Shrinks the building footprint inward at constant speed, tracking where edges converge. Produces ridge lines and hip endpoints automatically. Primary algorithm for `gabled`, `hipped`, `half_hipped`, `saltbox`, `gambrel`, `mansard`.
+- **Polygon Offset** (`@countertype/clipper2-ts`): Insets a polygon by a fixed distance while preserving parallel edges. Used by `gambrel` (break line at ~35% of half-width) and `mansard` (break ring + top plateau ring).
+- **CDT — Constrained Delaunay Triangulation** (`poly2tri`): Triangulates polygons while preserving specified edges and holes. Used for any footprint with inner rings (courtyards); `earcut` (via Three.js `ShapeUtils`) is used for simple cases.
+- **OBB (Oriented Bounding Box)**: Lightweight fallback for simple rectangular footprints — computes ridge direction and proportions from the longest edge without skeleton computation.
+
+### Roof Type Implementations
+
+| Shape | Primary Algorithm | Key Detail |
+|-------|------------------|------------|
+| **flat** | earcut / CDT | Horizontal cap; CDT when courtyard holes present |
+| **gabled** | OBB fast path OR skeleton | Two slopes meeting at ridge; skeleton handles L/T-shaped footprints; vertical gable walls at each end |
+| **hipped** | Skeleton (primary) / OBB gradient | Slopes on all sides; skeleton corner-collapse naturally produces hip faces; OBB gradient used if skeleton not ready |
+| **half_hipped** | Skeleton (hip detection + height clip) / OBB short ridge | Top 30% of each gable end is hipped; bottom 70% is a vertical gable wall; both `half-hipped` and `half_hipped` spellings accepted |
+| **pyramidal** | Fan triangulation to apex | One triangle per footprint edge, all converging at centroid apex at roofHeight |
+| **gambrel** | Polygon inset (break line) + skeleton/OBB (ridge) | Steep lower slope / shallower upper slope per side; 3-ring stitch (outer eave → break line → ridge) |
+| **mansard** | Polygon inset ×2 + ring stitch | Two slopes on all 4 sides; break ring at 60% of roofHeight; flat plateau top; 3-ring stitch |
+| **saltbox** | OBB offset ridge / skeleton | Ridge displaced from centerline (≈30% of half-width) creating one steep and one shallow slope |
+| **skillion** | Per-vertex gradient | Single sloped plane; `roof_direction` defines downhill direction (low eave); no ridge |
+| **dome** | SphereGeometry + minimum bounding circle | Upper hemisphere scaled to enclose footprint; MBC (Welzl algorithm) determines radius |
+| **onion** | SphereGeometry + MBC + bulge transform | Like dome but with bulge profile: `bulge = 1 + 0.35×sin(t×π)`, `taper = 1 − 0.2×t` — widest at ~50% height |
+| **round** | Per-vertex ellipse formula + ring subdivision | Barrel vault; semi-ellipse cross-section; shorter OBB axis becomes the barrel direction; ring vertices subdivided for smooth curvature |
+
+Any unrecognized `roof_shape` value falls back to **flat** rendering.
 
 ## Geometry Details
 
@@ -57,12 +76,12 @@ Buildings are identified by Overture fields:
 **Pitched-Roof Building:**
 - `Group` containing 2 meshes:
   1. **Wall mesh**: `ExtrudeGeometry` with wall color
-  2. **Roof mesh**: Parametric shape (gabled polygon, cone, hemisphere, etc.) with roof color
+  2. **Roof mesh**: Geometry from the matching `IRoofGeometryStrategy` (one of 11 strategies) with roof color
 - Roof mesh positioned above walls at height `wallHeight`
 
 **Material Colors:**
-- Wall: `building:material` override → `building` type default → fallback #d0ccbc
-- Roof: `roof:colour` override → `roof:material` override → roof shape default
+- Wall: `facade_color` override → `facade_material` lookup → `class` type default → fallback #d0ccbc
+- Roof: `roof_color` override → `roof_material` lookup → roof shape default
 
 ## Configuration
 
