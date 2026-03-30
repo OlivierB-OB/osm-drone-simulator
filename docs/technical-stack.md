@@ -160,6 +160,35 @@ This document records the key technology decisions made for the drone simulator 
 
 ---
 
+## Roof Geometry Libraries
+
+### Decision: straight-skeleton + Clipper2 + poly2tri
+
+**Rationale:**
+
+**`straight-skeleton` (WASM):**
+- CGAL straight skeleton algorithm compiled to WebAssembly for medial axis computation
+- Automatically computes ridge lines and hip faces for complex building footprints
+- Handles irregular polygons and courtyards (holes) without manual edge detection
+- Async WASM initialization with eager loading (ready before tiles processed)
+
+**`@countertype/clipper2-ts`:**
+- Native float polygon offset/inset operations (no integer scaling required)
+- Creates break lines for multi-slope roofs (Mansard: 2 breaks, Gambrel: 1 break)
+- Clipper2 successor to clipper-lib with TypeScript support and active maintenance
+
+**`poly2tri`:**
+- Constrained Delaunay Triangulation for polygons with interior edges
+- Reserved for future use: flat roofs with courtyards requiring edge constraints
+- Current implementations use `ShapeUtils` (Three.js earcut wrapper) which is sufficient
+
+**Constraints Addressed:**
+- Supports 13 roof types: flat, skillion, gabled, hipped, half-hipped, gambrel, mansard, saltbox, pyramidal, dome, onion, cone, round
+- Maintains synchronous API via eager WASM initialization
+- Wrapper utilities (`straightSkeletonUtils.ts`, `polygonOffsetUtils.ts`, `cdtUtils.ts`) isolate library APIs from roof strategies
+
+---
+
 ## UI Components
 
 ### Decision: Kobalte + solid-icons
@@ -272,6 +301,7 @@ This document records the key technology decisions made for the drone simulator 
 | **Test DOM** | happy-dom | Lightweight, fast, sufficient for logic testing |
 | **CSS** | Tailwind CSS | Utility-first, CSS-first config, Vite-native plugin |
 | **Geospatial** | Turf.js + PMTiles | Modular GIS math, serverless tile access, MVT decoding |
+| **Roof Geometry** | straight-skeleton + Clipper2 + poly2tri | WASM medial axis, polygon offset, constrained triangulation |
 | **UI Components** | Kobalte + solid-icons | Accessible SolidJS primitives, tree-shakeable icons |
 | **Linting** | ESLint | TypeScript-aware, rule-based, auto-fix, flat config |
 | **Formatting** | Prettier | Opinionated, minimal config, language-agnostic, IDE support |
