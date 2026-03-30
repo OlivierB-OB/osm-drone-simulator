@@ -40,6 +40,16 @@ export class OnionRoofStrategy implements IRoofGeometryStrategy {
       );
     }
     pos.needsUpdate = true;
+    // Z-negation in vertex transform is a reflection that reverses triangle winding.
+    // Swap index 0↔2 in every triangle to restore outward-facing normals.
+    const idx = geom.index!;
+    const arr = idx.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      const tmp = arr[i]!;
+      arr[i] = arr[i + 2]!;
+      arr[i + 2] = tmp;
+    }
+    idx.needsUpdate = true;
     geom.computeVertexNormals();
     return geom;
   }
