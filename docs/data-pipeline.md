@@ -284,7 +284,7 @@ flowchart LR
 - **Contextual data details**: [`data/contextual.md`](data/contextual.md)
 - **Canvas rendering**: [`visualization/canvas-rendering.md`](visualization/canvas-rendering.md)
 - **Ground surface (terrain mesh)**: [`visualization/ground-surface.md`](visualization/ground-surface.md)
-- **3D objects**: [`visualization/objects.md`](visualization/objects.md)
+- **3D objects**: [`visualization/objects/README.md`](visualization/objects/README.md)
 - **Coordinate system**: [`coordinate-system.md`](coordinate-system.md) — geographic → Three.js local tangent plane math
 - **Tile ring system**: [`tile-ring-system.md`](tile-ring-system.md) — ring loading details
 - **Glossary**: [`glossary.md`](glossary.md)

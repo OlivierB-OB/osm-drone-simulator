@@ -222,7 +222,7 @@ The `docs/` directory contains 79 comprehensive files organized by topic:
 
 - **[visualization/canvas-rendering.md](docs/visualization/canvas-rendering.md)** — Feature rasterization (9-layer painter's algorithm)
 - **[visualization/ground-surface.md](docs/visualization/ground-surface.md)** — Terrain mesh generation
-- **[visualization/objects.md](docs/visualization/objects.md)** — Buildings, structures, drone
+- **[visualization/objects/README.md](docs/visualization/objects/README.md)** — Buildings, structures, drone
 
 ### Reference
 

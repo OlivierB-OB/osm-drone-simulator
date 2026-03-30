@@ -498,7 +498,7 @@ matrix.setPosition(treeX, terrainY + trunkOffset, -treeY);
 
 ### Lifecycle Integration
 
-ElevationSampler is initialized once at app startup and distributed to all mesh factories. It samples terrain elevation when creating 3D feature objects. For complete integration details, see **[3D Object Visualization](../visualization/objects.md#rendering-pipeline)** and **[Ground Surface Rendering](../visualization/ground-surface.md#integration-with-drone-system)**.
+ElevationSampler is initialized once at app startup and distributed to all mesh factories. It samples terrain elevation when creating 3D feature objects. For complete integration details, see **[3D Object Visualization](../visualization/objects/systems.md#rendering-pipeline)** and **[Ground Surface Rendering](../visualization/ground-surface.md#integration-with-drone-system)**.
 
 ### Coordinate System Consistency
 
@@ -536,4 +536,4 @@ This ensures:
 
 - **[Elevation Data System](./elevations.md)** — Terrarium format, tile loading, caching
 - **[Coordinate System](../coordinate-system.md)** — Complete coordinate transformation mapping
-- **[3D Object Visualization](../objects.md)** — How mesh factories use ElevationSampler
+- **[3D Object Visualization](../visualization/objects/README.md)** — How mesh factories use ElevationSampler

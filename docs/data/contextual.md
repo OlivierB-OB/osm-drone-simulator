@@ -305,7 +305,7 @@ Nine categories of contextual features are parsed and rendered:
 For colors, widths, heights, and detailed rendering specs, see:
 
 - **[Canvas Rendering](../visualization/canvas-rendering.md)** - layer ordering, colors, widths, dash patterns, drawing algorithms
-- **[3D Object Visualization](../visualization/objects.md)** - heights, shapes, geometry, materials, roof types
+- **[3D Object Visualization](../visualization/objects/README.md)** - heights, shapes, geometry, materials, roof types
 
 ## Graceful Degradation
 
