@@ -153,21 +153,34 @@ describe('Drone', () => {
       expect(testDrone.getElevation()).toEqual(droneConfig.elevationMinimum);
     });
 
-    it('should respect maximum elevation bound', () => {
-      const testDrone = new Drone(testLocation, 0, 495);
-      testDrone.changeElevation(10);
-      expect(testDrone.getElevation()).toEqual(droneConfig.elevationMaximum);
-    });
-
     it('should clamp at zero when going below minimum', () => {
       drone.changeElevation(-10);
       expect(drone.getElevation()).toEqual(0);
     });
 
-    it('should clamp at maximum when exceeding limit', () => {
-      const testDrone = new Drone(testLocation, 0, 450);
+    it('should allow elevation above 500m (no maximum cap)', () => {
+      const testDrone = new Drone(testLocation, 0, 495);
       testDrone.changeElevation(100);
-      expect(testDrone.getElevation()).toEqual(500);
+      expect(testDrone.getElevation()).toEqual(595);
+    });
+
+    it('should snap elevation up when setElevationFloor exceeds current elevation', () => {
+      const testDrone = new Drone(testLocation, 0, 10);
+      testDrone.setElevationFloor(50);
+      expect(testDrone.getElevation()).toEqual(50);
+    });
+
+    it('should not change elevation when setElevationFloor is below current elevation', () => {
+      const testDrone = new Drone(testLocation, 0, 100);
+      testDrone.setElevationFloor(50);
+      expect(testDrone.getElevation()).toEqual(100);
+    });
+
+    it('should enforce dynamic floor in changeElevation', () => {
+      const testDrone = new Drone(testLocation, 0, 100);
+      testDrone.setElevationFloor(80);
+      testDrone.changeElevation(-30);
+      expect(testDrone.getElevation()).toEqual(80);
     });
   });
 

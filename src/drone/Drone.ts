@@ -18,6 +18,7 @@ export class Drone {
   private isMovingLeft: boolean = false;
   private isMovingRight: boolean = false;
   private readonly emitter = new TypedEventEmitter<DroneEvents>();
+  private elevationFloor: number = droneConfig.elevationMinimum;
 
   constructor(
     private readonly location: GeoCoordinates,
@@ -64,11 +65,16 @@ export class Drone {
     return this.elevation;
   }
 
+  setElevationFloor(meters: number): void {
+    this.elevationFloor = meters;
+    if (this.elevation < this.elevationFloor) {
+      this.elevation = this.elevationFloor;
+      this.emitter.emit('elevationChanged', this.elevation);
+    }
+  }
+
   changeElevation(deltaMeters: number): void {
-    this.elevation = Math.max(
-      droneConfig.elevationMinimum,
-      Math.min(droneConfig.elevationMaximum, this.elevation + deltaMeters)
-    );
+    this.elevation = Math.max(this.elevationFloor, this.elevation + deltaMeters);
     this.emitter.emit('elevationChanged', this.elevation);
   }
 

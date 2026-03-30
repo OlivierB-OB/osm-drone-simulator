@@ -80,6 +80,15 @@ export function App() {
     );
 
     const elevationSampler = new ElevationSampler(elevationData);
+
+    const updateTerrainFloor = () => {
+      const location = drone!.getLocation();
+      const terrainElevation = elevationSampler.sampleAt(location.lat, location.lng);
+      drone!.setElevationFloor(terrainElevation + 1);
+    };
+    elevationData.on('tileAdded', updateTerrainFloor);
+    drone.on('locationChanged', updateTerrainFloor);
+
     meshObjectManager = new MeshObjectManager(
       viewer3D.getScene(),
       contextData,
@@ -95,6 +104,8 @@ export function App() {
     droneController = new DroneController(containerRef, drone);
 
     return () => {
+      elevationData?.off('tileAdded', updateTerrainFloor);
+      drone?.off('locationChanged', updateTerrainFloor);
       animationLoop?.dispose();
       viewer3D?.dispose();
       droneController?.dispose();

@@ -18,9 +18,8 @@ export const droneConfig = {
   // Mouse sensitivity for azimuth control (degrees per pixel of mouse movement)
   mouseSensitivity: 0.15,
 
-  // Elevation bounds in meters (0 = ground level)
+  // Elevation minimum in meters — static fallback floor before terrain data loads
   elevationMinimum: 0,
-  elevationMaximum: 500,
 
   // Elevation change per mouse wheel tick in meters
   wheelElevationSensitivity: 5,
