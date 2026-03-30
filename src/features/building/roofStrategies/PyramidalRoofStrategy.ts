@@ -12,6 +12,7 @@ export class PyramidalRoofStrategy implements IRoofGeometryStrategy {
       ring[0]![0] === ring[ring.length - 1]![0] &&
       ring[0]![1] === ring[ring.length - 1]![1];
     const count = isClosedRing ? ring.length - 1 : ring.length;
+    if (count < 3) return new BufferGeometry();
 
     // Detect ring orientation via shoelace (signed area).
     // Positive = CCW (standard math), Negative = CW.

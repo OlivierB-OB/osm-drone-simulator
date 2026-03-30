@@ -73,7 +73,11 @@ describe('PyramidalRoofStrategy', () => {
     it('produces same vertex count as CCW', () => {
       const ccw = rectRing(10, 6);
       const cw = rectRingCW(10, 6);
-      const params = { roofShape: 'pyramidal' as const, roofHeight: 3, ridgeAngle: 0 };
+      const params = {
+        roofShape: 'pyramidal' as const,
+        roofHeight: 3,
+        ridgeAngle: 0,
+      };
       const geomCCW = strategy.create({ outerRing: ccw, ...params });
       const geomCW = strategy.create({ outerRing: cw, ...params });
       expect(geomCW.getAttribute('position').count).toBe(
@@ -86,7 +90,11 @@ describe('PyramidalRoofStrategy', () => {
     it('produces same vertex count as open ring', () => {
       const open = rectRing(10, 6);
       const closed = [...open, open[0]!] as [number, number][];
-      const params = { roofShape: 'pyramidal' as const, roofHeight: 3, ridgeAngle: 0 };
+      const params = {
+        roofShape: 'pyramidal' as const,
+        roofHeight: 3,
+        ridgeAngle: 0,
+      };
       const geomOpen = strategy.create({ outerRing: open, ...params });
       const geomClosed = strategy.create({ outerRing: closed, ...params });
       expect(geomOpen.getAttribute('position').count).toBe(
@@ -114,6 +122,46 @@ describe('PyramidalRoofStrategy', () => {
     });
   });
 
+  describe('triangle polygon', () => {
+    it('produces 3 triangles', () => {
+      const ring: [number, number][] = [
+        [0, 3],
+        [3, -3],
+        [-3, -3],
+      ];
+      const geom = strategy.create({
+        outerRing: ring,
+        roofShape: 'pyramidal',
+        roofHeight: 4,
+        ridgeAngle: 0,
+      });
+      expect(geom.getAttribute('position').count).toBe(9);
+    });
+  });
+
+  describe('L-shape', () => {
+    it('produces 8 triangles for 8-vertex polygon', () => {
+      // non-closed 8-vertex polygon → count = 8 → 8 triangles → 24 vertices
+      const open: [number, number][] = [
+        [0, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+        [2, 4],
+        [0, 4],
+        [-1, 2],
+        [-1, 1],
+      ];
+      const geom = strategy.create({
+        outerRing: open,
+        roofShape: 'pyramidal',
+        roofHeight: 3,
+        ridgeAngle: 0,
+      });
+      expect(geom.getAttribute('position').count).toBe(24);
+    });
+  });
+
   describe('edge cases', () => {
     it('roofHeight=0 produces all Y=0', () => {
       const ring = rectRing(10, 6);
@@ -126,6 +174,61 @@ describe('PyramidalRoofStrategy', () => {
       const arr = geom.getAttribute('position').array as Float32Array;
       for (let i = 1; i < arr.length; i += 3) {
         expect(arr[i]).toBeCloseTo(0);
+      }
+    });
+
+    it('< 3 vertices returns empty geometry', () => {
+      const geom = strategy.create({
+        outerRing: [
+          [0, 0],
+          [1, 1],
+        ],
+        roofShape: 'pyramidal',
+        roofHeight: 3,
+        ridgeAngle: 0,
+      });
+      expect(geom.getAttribute('position')).toBeUndefined();
+    });
+
+    it('ignores inner rings', () => {
+      const outer = rectRing(10, 6);
+      const inner: [number, number][] = [
+        [1, 1],
+        [2, 1],
+        [2, 2],
+        [1, 2],
+      ];
+      const withHole = strategy.create({
+        outerRing: outer,
+        innerRings: [inner],
+        roofShape: 'pyramidal',
+        roofHeight: 3,
+        ridgeAngle: 0,
+      });
+      const noHole = strategy.create({
+        outerRing: outer,
+        roofShape: 'pyramidal',
+        roofHeight: 3,
+        ridgeAngle: 0,
+      });
+      expect(withHole.getAttribute('position').count).toBe(
+        noHole.getAttribute('position').count
+      );
+    });
+  });
+
+  describe('normals', () => {
+    it('all face normals have positive Y component (slopes upward)', () => {
+      const geom = strategy.create({
+        outerRing: rectRing(10, 6),
+        roofShape: 'pyramidal',
+        roofHeight: 5,
+        ridgeAngle: 0,
+      });
+      const normals = geom.getAttribute('normal').array as Float32Array;
+      // Each triangle's 3 vertices share the same computed normal — check every vertex
+      for (let i = 1; i < normals.length; i += 3) {
+        expect(normals[i]!).toBeGreaterThan(0);
       }
     });
   });

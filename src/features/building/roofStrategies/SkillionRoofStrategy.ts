@@ -2,6 +2,22 @@ import type { BufferGeometry } from 'three';
 import type { IRoofGeometryStrategy, RoofParams } from './types';
 import { normalizeRing, buildOutlineRoofGeometry } from './roofGeometryUtils';
 
+/**
+ * Skillion roof: a single planar slope with no ridge, apex, or breaks.
+ *
+ * Slope direction: `ridgeAngle` is the along-ridge angle in local Mercator radians.
+ * For skillion, `BuildingMeshFactory` adds `PI/2` to the resolved ridge angle when
+ * `roofDirection` is provided (line 227-229), so `ridgeAngle` effectively points
+ * along the across-slope (high-to-low) axis. The across-slope unit vector is:
+ *   acrossX = -sin(ridgeAngle), acrossY = cos(ridgeAngle)
+ * Vertices with higher projection values sit at the high eave (height = roofHeight);
+ * vertices with lower projections sit at the low eave (height = 0).
+ *
+ * Height formula: height[i] = roofHeight * (proj[i] - minProj) / projRange
+ *
+ * Inner rings (courtyards) are projected using the outer ring's minProj/maxProj,
+ * ensuring courtyard edges sit on the same continuous slope plane as the outer ring.
+ */
 export class SkillionRoofStrategy implements IRoofGeometryStrategy {
   create(params: RoofParams): BufferGeometry {
     const ring = params.outerRing;

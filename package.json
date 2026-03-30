@@ -42,6 +42,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@countertype/clipper2-ts": "^1.5.4-3.9a869ba",
     "@kobalte/core": "^0.13.11",
     "@mapbox/vector-tile": "^2.0.4",
     "@turf/area": "^7.3.4",
@@ -57,8 +58,10 @@
     "geojson": "^0.5.0",
     "pbf": "^4.0.1",
     "pmtiles": "^4.4.0",
+    "poly2tri": "^1.5.0",
     "solid-icons": "^1.2.0",
     "solid-js": "^1.9.11",
+    "straight-skeleton": "^3.0.0",
     "three": "^0.160.1"
   }
 }

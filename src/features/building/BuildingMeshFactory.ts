@@ -146,9 +146,7 @@ export class BuildingMeshFactory {
       for (let r = 1; r < polygon.coordinates.length; r++) {
         const innerRing = polygon.coordinates[r];
         if (!innerRing || innerRing.length < 4) continue;
-        localInnerRings.push(
-          (innerRing as [number, number][]).map(toLocal)
-        );
+        localInnerRings.push((innerRing as [number, number][]).map(toLocal));
       }
 
       // Resolve heights
@@ -229,8 +227,7 @@ export class BuildingMeshFactory {
         }
         const roofGeom = this.roofFactory.create({
           outerRing: localRing,
-          innerRings:
-            localInnerRings.length > 0 ? localInnerRings : undefined,
+          innerRings: localInnerRings.length > 0 ? localInnerRings : undefined,
           roofShape,
           roofHeight,
           ridgeAngle,

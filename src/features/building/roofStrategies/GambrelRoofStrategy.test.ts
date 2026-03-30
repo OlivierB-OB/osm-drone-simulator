@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ShapeUtils, Vector2 } from 'three';
 import { GambrelRoofStrategy } from './GambrelRoofStrategy';
 
-// 10×6 rectangle, centred at origin (CCW)
+// 10×6 rectangle centred at origin (CCW)
 const rect: [number, number][] = [
   [-5, -3],
   [5, -3],
@@ -10,113 +9,220 @@ const rect: [number, number][] = [
   [-5, 3],
 ];
 
-// Closed ring variant
 const rectClosed: [number, number][] = [...rect, rect[0]!];
 
-// Hexagon with vertices on and off the ridge line
-const hexRing: [number, number][] = [
-  [-5, -3],
-  [5, -3],
-  [5, 0], // ridge vertex
-  [5, 3],
-  [-5, 3],
-  [-5, 0], // ridge vertex
+// Square 6×6
+const square: [number, number][] = [
+  [-3, -3],
+  [3, -3],
+  [3, 3],
+  [-3, 3],
 ];
 
-function expectedFloatCount(ring: [number, number][]): number {
-  const contour = ring.map(([x, y]) => new Vector2(x, y));
-  const topTriCount = ShapeUtils.triangulateShape(contour, []).length;
-  const sideTriCount = ring.length * 2;
-  return (topTriCount + sideTriCount) * 3 * 3;
-}
-
 const strategy = new GambrelRoofStrategy();
+
 const baseParams = {
   outerRing: rect,
-  roofShape: 'gambrel',
+  roofShape: 'gambrel' as const,
   roofHeight: 5,
   ridgeAngle: 0,
 };
 
+const BREAK_HEIGHT_FRACTION = 0.55;
+const breakH = baseParams.roofHeight * BREAK_HEIGHT_FRACTION; // 2.75
+
+// --------------------------------------------------------------------------
+// Helpers
+// --------------------------------------------------------------------------
+
+function getYValues(geom: ReturnType<typeof strategy.create>): number[] {
+  const pos = geom.attributes.position!;
+  const ys: number[] = [];
+  for (let i = 0; i < pos.count; i++) ys.push(pos.getY(i));
+  return ys;
+}
+
+function hasYNear(ys: number[], target: number, tol = 0.15): boolean {
+  return ys.some((y) => Math.abs(y - target) < tol);
+}
+
+function hasFaceWithNormalY(
+  geom: ReturnType<typeof strategy.create>,
+  predicate: (ny: number) => boolean
+): boolean {
+  const pos = geom.attributes.position!;
+  for (let t = 0; t < pos.count; t += 3) {
+    const ax = pos.getX(t + 1) - pos.getX(t);
+    const _ay = pos.getY(t + 1) - pos.getY(t);
+    const az = pos.getZ(t + 1) - pos.getZ(t);
+    const bx = pos.getX(t + 2) - pos.getX(t);
+    const _by = pos.getY(t + 2) - pos.getY(t);
+    const bz = pos.getZ(t + 2) - pos.getZ(t);
+    const ny = az * bx - ax * bz;
+    // Also compute nx, nz for gable detection if needed
+    if (predicate(ny)) return true;
+  }
+  return false;
+}
+
+// --------------------------------------------------------------------------
+// Geometry validity
+// --------------------------------------------------------------------------
+
 describe('GambrelRoofStrategy', () => {
-  it('creates geometry without error', () => {
+  it('creates non-indexed geometry with position attribute', () => {
     const geom = strategy.create(baseParams);
     expect(geom).toBeDefined();
     expect(geom.attributes.position).toBeDefined();
-  });
-
-  it('produces correct vertex count for outline-based geometry', () => {
-    const geom = strategy.create(baseParams);
-    expect(geom.attributes.position!.array.length).toBe(
-      expectedFloatCount(rect)
-    );
-  });
-
-  it('is non-indexed geometry', () => {
-    const geom = strategy.create(baseParams);
     expect(geom.index).toBeNull();
   });
 
-  it('all heights are in [0, roofHeight]', () => {
+  it('has vertices (non-empty)', () => {
     const geom = strategy.create(baseParams);
-    const pos = geom.attributes.position!;
-    for (let i = 0; i < pos.count; i++) {
-      expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
-      expect(pos.getY(i)).toBeLessThanOrEqual(baseParams.roofHeight + 1e-6);
+    expect(geom.attributes.position!.count).toBeGreaterThan(0);
+  });
+
+  it('all vertex Y values are in [0, roofHeight]', () => {
+    const geom = strategy.create(baseParams);
+    const ys = getYValues(geom);
+    for (const y of ys) {
+      expect(y).toBeGreaterThanOrEqual(-1e-6);
+      expect(y).toBeLessThanOrEqual(baseParams.roofHeight + 1e-6);
     }
   });
 
-  it('ridge vertex reaches roofHeight', () => {
-    // Use hexagon which has vertices on the ridge centreline
-    const geom = strategy.create({ ...baseParams, outerRing: hexRing });
-    const pos = geom.attributes.position!;
-    let maxY = -Infinity;
-    for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
-    expect(maxY).toBeCloseTo(baseParams.roofHeight, 1);
+  it('has vertices at Y=0 (eave)', () => {
+    const ys = getYValues(strategy.create(baseParams));
+    expect(hasYNear(ys, 0, 1e-5)).toBe(true);
   });
 
-  it('base is at Y=0', () => {
-    const geom = strategy.create(baseParams);
-    const pos = geom.attributes.position!;
-    let minY = Infinity;
-    for (let i = 0; i < pos.count; i++) minY = Math.min(minY, pos.getY(i));
-    expect(minY).toBeCloseTo(0, 5);
+  it('has vertices at Y≈roofHeight (ridge)', () => {
+    const ys = getYValues(strategy.create(baseParams));
+    expect(hasYNear(ys, baseParams.roofHeight, 0.1)).toBe(true);
   });
 
-  it('has upward-facing faces (top surface normals with positive Y)', () => {
+  // --------------------------------------------------------------------------
+  // Gambrel-specific shape
+  // --------------------------------------------------------------------------
+
+  it('has vertices at break height (Y ≈ breakH)', () => {
+    const ys = getYValues(strategy.create(baseParams));
+    expect(hasYNear(ys, breakH, 0.15)).toBe(true);
+  });
+
+  it('has three distinct height bands: 0, breakH, roofHeight', () => {
+    const ys = getYValues(strategy.create(baseParams));
+    expect(hasYNear(ys, 0, 1e-5)).toBe(true);
+    expect(hasYNear(ys, breakH, 0.15)).toBe(true);
+    expect(hasYNear(ys, baseParams.roofHeight, 0.1)).toBe(true);
+  });
+
+  it('has upward-facing slope faces (face normal Y > 0)', () => {
+    const geom = strategy.create(baseParams);
+    expect(hasFaceWithNormalY(geom, (ny) => ny > 0.01)).toBe(true);
+  });
+
+  it('has gable-end faces with normals pointing along the ridge direction', () => {
+    // ridgeAngle=0: ridge along X → gable faces have |nx| dominant
     const geom = strategy.create(baseParams);
     const pos = geom.attributes.position!;
-    let foundUpward = false;
+    let found = false;
     for (let t = 0; t < pos.count; t += 3) {
-      const ax = pos.getX(t + 1) - pos.getX(t);
-      const az = pos.getZ(t + 1) - pos.getZ(t);
-      const bx = pos.getX(t + 2) - pos.getX(t);
-      const bz = pos.getZ(t + 2) - pos.getZ(t);
+      const ax = pos.getX(t + 1) - pos.getX(t),
+        ay = pos.getY(t + 1) - pos.getY(t),
+        az = pos.getZ(t + 1) - pos.getZ(t);
+      const bx = pos.getX(t + 2) - pos.getX(t),
+        by = pos.getY(t + 2) - pos.getY(t),
+        bz = pos.getZ(t + 2) - pos.getZ(t);
+      const nx = ay * bz - az * by;
       const ny = az * bx - ax * bz;
-      if (ny > 0.01) {
-        foundUpward = true;
+      const nz = ax * by - ay * bx;
+      const lenSq = nx * nx + ny * ny + nz * nz;
+      if (lenSq < 1e-12) continue;
+      // Gable end for ridgeAngle=0: normal mostly in X direction
+      if (Math.abs(nx) / Math.sqrt(lenSq) > 0.6) {
+        found = true;
         break;
       }
     }
-    expect(foundUpward).toBe(true);
+    expect(found).toBe(true);
   });
 
-  it('produces same geometry for closed and open ring', () => {
+  // --------------------------------------------------------------------------
+  // Ridge direction
+  // --------------------------------------------------------------------------
+
+  it('ridgeAngle=0: ridge vertices (Y=roofHeight) all have Z≈0 (ridge along X)', () => {
+    const geom = strategy.create(baseParams);
+    const pos = geom.attributes.position!;
+    let found = false;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getY(i) - baseParams.roofHeight) < 0.1) {
+        expect(Math.abs(pos.getZ(i))).toBeLessThan(0.1);
+        found = true;
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  it('ridgeAngle=π/2: ridge vertices (Y=roofHeight) all have X≈0 (ridge along local Y)', () => {
+    const geom = strategy.create({ ...baseParams, ridgeAngle: Math.PI / 2 });
+    const pos = geom.attributes.position!;
+    let found = false;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getY(i) - baseParams.roofHeight) < 0.1) {
+        expect(Math.abs(pos.getX(i))).toBeLessThan(0.1);
+        found = true;
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  // --------------------------------------------------------------------------
+  // Footprint variations
+  // --------------------------------------------------------------------------
+
+  it('square footprint produces valid gambrel geometry', () => {
+    const geom = strategy.create({ ...baseParams, outerRing: square });
+    expect(geom.attributes.position!.count).toBeGreaterThan(0);
+    const ys = getYValues(geom);
+    for (const y of ys) {
+      expect(y).toBeGreaterThanOrEqual(-1e-6);
+      expect(y).toBeLessThanOrEqual(baseParams.roofHeight + 1e-6);
+    }
+  });
+
+  it('closed ring and open ring produce identical vertex count', () => {
     const geomOpen = strategy.create(baseParams);
     const geomClosed = strategy.create({
       ...baseParams,
       outerRing: rectClosed,
     });
-    expect(geomOpen.attributes.position!.array.length).toBe(
-      geomClosed.attributes.position!.array.length
+    expect(geomOpen.attributes.position!.count).toBe(
+      geomClosed.attributes.position!.count
     );
   });
 
-  it('different ridgeAngle produces same vertex count', () => {
-    const geomA = strategy.create(baseParams);
-    const geomB = strategy.create({ ...baseParams, ridgeAngle: Math.PI / 4 });
-    expect(geomA.attributes.position!.array.length).toBe(
-      geomB.attributes.position!.array.length
-    );
+  // --------------------------------------------------------------------------
+  // Edge cases
+  // --------------------------------------------------------------------------
+
+  it('roofHeight=0: all vertices at Y=0', () => {
+    const geom = strategy.create({ ...baseParams, roofHeight: 0 });
+    const ys = getYValues(geom);
+    for (const y of ys) {
+      expect(y).toBeCloseTo(0, 5);
+    }
+  });
+
+  it('degenerate polygon (< 3 vertices) returns empty geometry', () => {
+    const geom = strategy.create({
+      ...baseParams,
+      outerRing: [
+        [0, 0],
+        [1, 0],
+      ] as [number, number][],
+    });
+    expect(geom.attributes.position).toBeUndefined();
   });
 });

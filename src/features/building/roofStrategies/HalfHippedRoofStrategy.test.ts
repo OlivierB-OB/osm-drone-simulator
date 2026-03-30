@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { ShapeUtils, Vector2 } from 'three';
 import { HalfHippedRoofStrategy } from './HalfHippedRoofStrategy';
 
 // 20×10 rectangle (elongated, centred at origin, CCW)
@@ -10,27 +9,21 @@ const rect: [number, number][] = [
   [-10, 5],
 ];
 
-// Hexagon with vertices on the ridge centreline
-const hexRing: [number, number][] = [
-  [-10, -5],
-  [10, -5],
-  [10, 0], // ridge vertex
-  [10, 5],
-  [-10, 5],
-  [-10, 0], // ridge vertex
-];
+// Same rectangle but CW
+const rectCW: [number, number][] = [...rect].reverse();
 
-function expectedFloatCount(ring: [number, number][]): number {
-  const contour = ring.map(([x, y]) => new Vector2(x, y));
-  const topTriCount = ShapeUtils.triangulateShape(contour, []).length;
-  const sideTriCount = ring.length * 2;
-  return (topTriCount + sideTriCount) * 3 * 3;
-}
+// Square — should delegate to Pyramidal
+const square: [number, number][] = [
+  [-5, -5],
+  [5, -5],
+  [5, 5],
+  [-5, 5],
+];
 
 const strategy = new HalfHippedRoofStrategy();
 const baseParams = {
   outerRing: rect,
-  roofShape: 'half-hipped',
+  roofShape: 'half_hipped',
   roofHeight: 5,
   ridgeAngle: 0,
 };
@@ -40,13 +33,12 @@ describe('HalfHippedRoofStrategy', () => {
     const geom = strategy.create(baseParams);
     expect(geom).toBeDefined();
     expect(geom.attributes.position).toBeDefined();
+    expect(geom.attributes.position!.count).toBeGreaterThan(0);
   });
 
-  it('produces correct vertex count for outline-based geometry', () => {
+  it('produces non-indexed geometry', () => {
     const geom = strategy.create(baseParams);
-    expect(geom.attributes.position!.array.length).toBe(
-      expectedFloatCount(rect)
-    );
+    expect(geom.index).toBeNull();
   });
 
   it('base is at Y=0', () => {
@@ -57,14 +49,12 @@ describe('HalfHippedRoofStrategy', () => {
     expect(minY).toBeCloseTo(0, 5);
   });
 
-  it('ridge region has heights above zero', () => {
-    // HalfHipped hips the gable ends, so boundary vertices can't reach full roofHeight
-    const geom = strategy.create({ ...baseParams, outerRing: hexRing });
+  it('ridge vertices reach roofHeight', () => {
+    const geom = strategy.create(baseParams);
     const pos = geom.attributes.position!;
     let maxY = -Infinity;
     for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
-    expect(maxY).toBeGreaterThan(0);
-    expect(maxY).toBeLessThanOrEqual(baseParams.roofHeight + 1e-6);
+    expect(maxY).toBeCloseTo(baseParams.roofHeight, 4);
   });
 
   it('all heights are in [0, roofHeight]', () => {
@@ -73,6 +63,14 @@ describe('HalfHippedRoofStrategy', () => {
     for (let i = 0; i < pos.count; i++) {
       expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
       expect(pos.getY(i)).toBeLessThanOrEqual(baseParams.roofHeight + 1e-6);
+    }
+  });
+
+  it('normals have non-negative Y component', () => {
+    const geom = strategy.create(baseParams);
+    const normals = geom.attributes.normal!;
+    for (let i = 0; i < normals.count; i++) {
+      expect(normals.getY(i)).toBeGreaterThanOrEqual(-0.01);
     }
   });
 
@@ -94,11 +92,21 @@ describe('HalfHippedRoofStrategy', () => {
     }
   });
 
-  it('normals have non-negative Y component', () => {
-    const geom = strategy.create(baseParams);
-    const normals = geom.attributes.normal!;
-    for (let i = 0; i < normals.count; i++) {
-      expect(normals.getY(i)).toBeGreaterThanOrEqual(-0.01);
+  it('CW and CCW winding both produce valid geometry', () => {
+    const geomCCW = strategy.create(baseParams);
+    const geomCW = strategy.create({ ...baseParams, outerRing: rectCW });
+    expect(geomCCW.attributes.position!.count).toBeGreaterThan(0);
+    expect(geomCW.attributes.position!.count).toBeGreaterThan(0);
+  });
+
+  it('near-square footprint delegates (produces valid geometry)', () => {
+    const geom = strategy.create({ ...baseParams, outerRing: square });
+    expect(geom.attributes.position!.count).toBeGreaterThan(0);
+    for (let i = 0; i < geom.attributes.position!.count; i++) {
+      expect(geom.attributes.position!.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+      expect(geom.attributes.position!.getY(i)).toBeLessThanOrEqual(
+        baseParams.roofHeight + 1e-6
+      );
     }
   });
 });

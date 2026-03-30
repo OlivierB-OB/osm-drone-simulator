@@ -6,6 +6,11 @@ import {
 } from 'three';
 import type { OBB } from './types';
 
+export interface RidgeLine {
+  start: [number, number];
+  end: [number, number];
+}
+
 /**
  * Computes the oriented bounding box of a polygon ring by finding the
  * longest edge and projecting all vertices onto that axis.
@@ -222,9 +227,12 @@ export function buildOutlineRoofGeometry(
   const triangles = ShapeUtils.triangulateShape(contour, holes);
 
   // Collect all rings and their heights for wall generation
-  const allRings: { ring: [number, number][]; heights: Float64Array; count: number; isInner: boolean }[] = [
-    { ring, heights, count, isInner: false },
-  ];
+  const allRings: {
+    ring: [number, number][];
+    heights: Float64Array;
+    count: number;
+    isInner: boolean;
+  }[] = [{ ring, heights, count, isInner: false }];
   if (innerRings && innerHeights) {
     for (let r = 0; r < innerRings.length; r++) {
       const { count: hCount } = normalizeRing(innerRings[r]!);
@@ -310,4 +318,223 @@ export function buildOutlineRoofGeometry(
   geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geom.computeVertexNormals();
   return geom;
+}
+
+// ---------------------------------------------------------------------------
+// Minimum Bounding Circle (Welzl's algorithm)
+// ---------------------------------------------------------------------------
+
+type P2 = [number, number];
+interface MBC {
+  center: [number, number];
+  radius: number;
+}
+
+function trivialMBC(R: P2[]): MBC {
+  if (R.length === 0) return { center: [0, 0], radius: 0 };
+  if (R.length === 1) return { center: [R[0]![0], R[0]![1]], radius: 0 };
+  if (R.length === 2) {
+    const cx = (R[0]![0] + R[1]![0]) / 2;
+    const cy = (R[0]![1] + R[1]![1]) / 2;
+    return {
+      center: [cx, cy],
+      radius: Math.hypot(R[0]![0] - cx, R[0]![1] - cy),
+    };
+  }
+  // 3 points: circumcircle
+  const [a, b, c] = [R[0]!, R[1]!, R[2]!];
+  const ax = b[0] - a[0],
+    ay = b[1] - a[1];
+  const bx = c[0] - a[0],
+    by = c[1] - a[1];
+  const D = 2 * (ax * by - ay * bx);
+  if (Math.abs(D) < 1e-10) {
+    // Collinear: diameter of the longest-span pair
+    const dab = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const dbc = Math.hypot(c[0] - b[0], c[1] - b[1]);
+    const dac = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (dab >= dbc && dab >= dac)
+      return {
+        center: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+        radius: dab / 2,
+      };
+    if (dbc >= dac)
+      return {
+        center: [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2],
+        radius: dbc / 2,
+      };
+    return { center: [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], radius: dac / 2 };
+  }
+  const sq_a = ax * ax + ay * ay,
+    sq_b = bx * bx + by * by;
+  const ux = (by * sq_a - ay * sq_b) / D;
+  const uy = (ax * sq_b - bx * sq_a) / D;
+  return { center: [a[0] + ux, a[1] + uy], radius: Math.hypot(ux, uy) };
+}
+
+function welzlRec(pts: P2[], n: number, R: P2[]): MBC {
+  if (n === 0 || R.length === 3) return trivialMBC(R);
+  const p = pts[n - 1]!;
+  const d = welzlRec(pts, n - 1, R);
+  const dx = p[0] - d.center[0],
+    dy = p[1] - d.center[1];
+  if (dx * dx + dy * dy <= d.radius * d.radius + 1e-10) return d;
+  return welzlRec(pts, n - 1, [...R, p]);
+}
+
+/**
+ * Computes the minimum bounding circle (smallest enclosing circle) of a polygon
+ * ring using Welzl's randomized algorithm (O(n) expected time).
+ * Inner holes are not considered; pass only the outer ring.
+ */
+export function computeMinBoundingCircle(ring: [number, number][]): {
+  center: [number, number];
+  radius: number;
+} {
+  if (ring.length === 0) return { center: [0, 0], radius: 0 };
+  const isClose =
+    ring.length > 1 &&
+    ring[0]![0] === ring[ring.length - 1]![0] &&
+    ring[0]![1] === ring[ring.length - 1]![1];
+  const pts: P2[] = (isClose ? ring.slice(0, -1) : ring).slice() as P2[];
+  for (let i = pts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pts[i], pts[j]] = [pts[j]!, pts[i]!];
+  }
+  return welzlRec(pts, pts.length, []);
+}
+
+// ---------------------------------------------------------------------------
+// Gabled roof helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Classifies a building footprint as 'rectangular' (suitable for OBB fast path)
+ * or 'complex' (requires straight skeleton).
+ *
+ * A footprint is rectangular if every vertex lies within `threshold` meters of
+ * its nearest OBB edge.
+ */
+export function classifyFootprintComplexity(
+  ring: [number, number][],
+  obb: OBB,
+  threshold = 0.5
+): 'rectangular' | 'complex' {
+  const cos = Math.cos(obb.angle);
+  const sin = Math.sin(obb.angle);
+  const cx = obb.center[0];
+  const cy = obb.center[1];
+
+  for (const [px, py] of ring) {
+    const dx = px - cx;
+    const dy = py - cy;
+    const localA = dx * cos + dy * sin; // along-ridge projection
+    const localB = -dx * sin + dy * cos; // across-ridge projection
+
+    // Distance from nearest OBB edge (axis-aligned in OBB frame)
+    const distA = Math.abs(Math.abs(localA) - obb.halfLength);
+    const distB = Math.abs(Math.abs(localB) - obb.halfWidth);
+    const minDist = Math.min(distA, distB);
+
+    if (minDist > threshold) return 'complex';
+  }
+  return 'rectangular';
+}
+
+/**
+ * Computes the ridge line endpoints for an OBB-based gabled roof.
+ * Ridge runs along the OBB's long axis (ridgeAngle direction).
+ */
+export function computeRidgeLine(obb: OBB, ridgeAngle: number): RidgeLine {
+  const cos = Math.cos(ridgeAngle);
+  const sin = Math.sin(ridgeAngle);
+  return {
+    start: [
+      obb.center[0] + obb.halfLength * cos,
+      obb.center[1] + obb.halfLength * sin,
+    ],
+    end: [
+      obb.center[0] - obb.halfLength * cos,
+      obb.center[1] - obb.halfLength * sin,
+    ],
+  };
+}
+
+/**
+ * Partitions ring vertex indices into two groups by their projection onto the
+ * across-ridge axis: positive-side (left) and negative-side (right).
+ *
+ * Vertices exactly on the centreline (|proj| < 1e-9) are assigned to `left`.
+ */
+export function partitionVerticesBySide(
+  ring: [number, number][],
+  count: number,
+  ridgeAngle: number
+): { left: number[]; right: number[] } {
+  const acrossX = -Math.sin(ridgeAngle);
+  const acrossY = Math.cos(ridgeAngle);
+  const left: number[] = [];
+  const right: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const proj = ring[i]![0] * acrossX + ring[i]![1] * acrossY;
+    if (proj >= 0) {
+      left.push(i);
+    } else {
+      right.push(i);
+    }
+  }
+  return { left, right };
+}
+
+// ---------------------------------------------------------------------------
+// Round roof helpers: edge subdivision for barrel vault curvature
+// ---------------------------------------------------------------------------
+
+const N_ARC_SEGMENTS = 8;
+
+/**
+ * Inserts subdivision vertices into a polygon ring at evenly-spaced
+ * across-ridge positions so that the semi-ellipse height formula produces
+ * visible curvature (rather than a flat quad for a 4-vertex building).
+ *
+ * Returns an open ring (no closing duplicate) with N_ARC_SEGMENTS-1 interior
+ * subdivision lines inserted wherever a footprint edge crosses them.
+ */
+export function enrichRingWithSubdivisions(
+  ring: [number, number][],
+  count: number,
+  acrossX: number,
+  acrossY: number,
+  halfWidth: number
+): [number, number][] {
+  // Interior across-values: skip ±halfWidth (those are the eave extremes)
+  const values: number[] = [];
+  for (let k = 1; k < N_ARC_SEGMENTS; k++) {
+    values.push(halfWidth * (-1 + (2 * k) / N_ARC_SEGMENTS));
+  }
+
+  const result: [number, number][] = [];
+  for (let i = 0; i < count; i++) {
+    const p1 = ring[i]!;
+    const p2 = ring[(i + 1) % count]!;
+    result.push(p1);
+
+    const proj1 = p1[0] * acrossX + p1[1] * acrossY;
+    const proj2 = p2[0] * acrossX + p2[1] * acrossY;
+    const dProj = proj2 - proj1;
+    if (Math.abs(dProj) < 1e-10) continue;
+
+    const hits: { t: number; pt: [number, number] }[] = [];
+    for (const v of values) {
+      const t = (v - proj1) / dProj;
+      if (t <= 0 || t >= 1) continue;
+      hits.push({
+        t,
+        pt: [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])],
+      });
+    }
+    hits.sort((a, b) => a.t - b.t);
+    for (const h of hits) result.push(h.pt);
+  }
+  return result;
 }

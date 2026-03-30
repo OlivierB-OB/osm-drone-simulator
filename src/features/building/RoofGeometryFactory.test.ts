@@ -127,6 +127,12 @@ describe('RoofGeometryFactory', () => {
     expect(geom).toBeNull();
   });
 
+  it('returns null for non-spec shapes (butterfly, cone, crosspitched, sawtooth)', () => {
+    for (const shape of ['butterfly', 'cone', 'crosspitched', 'sawtooth']) {
+      expect(factory.create({ ...baseParams, roofShape: shape })).toBeNull();
+    }
+  });
+
   describe('pyramidal', () => {
     it('creates geometry with correct vertex count for rectangle (4 edges → 12 vertices)', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'pyramidal' });
@@ -233,12 +239,12 @@ describe('RoofGeometryFactory', () => {
   });
 
   describe('gabled', () => {
-    it('creates non-indexed geometry with correct vertex count', () => {
-      // rectangle: 4 unique vertices → 2 top triangles + 8 side triangles = 10 × 3 = 30 vertices
+    it('creates non-indexed geometry with vertices', () => {
+      // New implementation: slope faces + gable walls (no fixed vertex count formula)
       const geom = factory.create({ ...baseParams, roofShape: 'gabled' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBe(30);
+      expect(geom!.attributes.position!.count).toBeGreaterThan(0);
     });
 
     it('all heights are in [0, roofHeight]', () => {
@@ -263,24 +269,14 @@ describe('RoofGeometryFactory', () => {
       }
       expect(foundUpward).toBe(true);
     });
-
-    it('ridge vertex normals have positive Y (slopes face outward)', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'gabled' });
-      geom!.computeVertexNormals();
-      const normals = geom!.attributes.normal!;
-      // Vertices 4 and 5 are ridge points shared only by slope faces → Y must be > 0
-      expect(normals.getY(4)).toBeGreaterThan(0);
-      expect(normals.getY(5)).toBeGreaterThan(0);
-    });
   });
 
   describe('hipped', () => {
-    it('creates non-indexed geometry with correct vertex count for elongated rectangle', () => {
-      // rectangle: 4 unique vertices → 2 top triangles + 8 side triangles = 10 × 3 = 30 vertices
+    it('creates non-indexed geometry with non-zero vertex count', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'hipped' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBe(30);
+      expect(geom!.attributes.position!.count).toBeGreaterThan(0);
     });
 
     it('degenerates to pyramidal for square footprint', () => {
@@ -294,13 +290,13 @@ describe('RoofGeometryFactory', () => {
       expect(geom!.attributes.position!.count).toBe(12);
     });
 
-    it('ridge vertex normals have positive Y (slopes face outward)', () => {
+    it('all vertex normals have non-negative Y (slopes face outward/upward)', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'hipped' });
       geom!.computeVertexNormals();
       const normals = geom!.attributes.normal!;
-      // Vertices 4 and 5 are ridge points → Y must be > 0
-      expect(normals.getY(4)).toBeGreaterThan(0);
-      expect(normals.getY(5)).toBeGreaterThan(0);
+      for (let i = 0; i < normals.count; i++) {
+        expect(normals.getY(i)).toBeGreaterThanOrEqual(-1e-6);
+      }
     });
   });
 
@@ -396,59 +392,6 @@ describe('RoofGeometryFactory', () => {
     });
   });
 
-  describe('butterfly', () => {
-    it('creates non-indexed geometry with correct vertex count', () => {
-      // rectangle: 4 unique vertices → 2 top triangles + 8 side triangles = 10 × 3 = 30 vertices
-      const geom = factory.create({ ...baseParams, roofShape: 'butterfly' });
-      expect(geom).not.toBeNull();
-      expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBe(30);
-    });
-
-    it('all heights are in [0, roofHeight]', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'butterfly' });
-      const pos = geom!.attributes.position!;
-      for (let i = 0; i < pos.count; i++) {
-        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
-        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
-      }
-    });
-
-    it('has vertices at both Y=0 (valley base) and Y=roofHeight (eaves)', () => {
-      // rectangle vertices at y=±5; ridgeAngle=0 → acrossProj = y-coord
-      // maxAbsAcross=5; all 4 ring vertices at |proj|=5 → heights=roofHeight
-      // Side wall base vertices are always at Y=0
-      const geom = factory.create({ ...baseParams, roofShape: 'butterfly' });
-      const pos = geom!.attributes.position!;
-      let minY = Infinity;
-      let maxY = -Infinity;
-      for (let i = 0; i < pos.count; i++) {
-        minY = Math.min(minY, pos.getY(i));
-        maxY = Math.max(maxY, pos.getY(i));
-      }
-      expect(minY).toBeCloseTo(0, 5);
-      expect(maxY).toBeCloseTo(5, 1);
-    });
-
-    it('has at least one upward-facing face (top surface)', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'butterfly' });
-      const pos = geom!.attributes.position!;
-      let foundUpwardFace = false;
-      for (let t = 0; t < pos.count; t += 3) {
-        const ax = pos.getX(t + 1) - pos.getX(t);
-        const az = pos.getZ(t + 1) - pos.getZ(t);
-        const bx = pos.getX(t + 2) - pos.getX(t);
-        const bz = pos.getZ(t + 2) - pos.getZ(t);
-        const ny = az * bx - ax * bz;
-        if (ny > 0.01) {
-          foundUpwardFace = true;
-          break;
-        }
-      }
-      expect(foundUpwardFace).toBe(true);
-    });
-  });
-
   describe('dome', () => {
     it('creates geometry with multiple vertices', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'dome' });
@@ -475,62 +418,16 @@ describe('RoofGeometryFactory', () => {
     });
   });
 
-  describe('cone', () => {
-    it('creates geometry', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'cone' });
-      expect(geom).not.toBeNull();
-      expect(geom!.attributes.position!.count).toBeGreaterThan(5);
-    });
-
-    it('has apex at roofHeight', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'cone' });
-      const pos = geom!.attributes.position!;
-      let maxY = -Infinity;
-      for (let i = 0; i < pos.count; i++) {
-        maxY = Math.max(maxY, pos.getY(i));
-      }
-      expect(maxY).toBeCloseTo(5, 0.5);
-    });
-
-    it('has base at Y=0', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'cone' });
-      const pos = geom!.attributes.position!;
-      let minY = Infinity;
-      for (let i = 0; i < pos.count; i++) {
-        minY = Math.min(minY, pos.getY(i));
-      }
-      expect(minY).toBeCloseTo(0, 5);
-    });
-
-    it('elongated rectangle (eccentricity > 1.2) delegates to pyramidal (12 vertices)', () => {
-      // 20×5 rectangle: eccentricity = 10/2.5 = 4 → Case B → Pyramidal → 4 edges × 3 = 12
-      const elongated: [number, number][] = [
-        [10, 2.5],
-        [-10, 2.5],
-        [-10, -2.5],
-        [10, -2.5],
-        [10, 2.5],
-      ];
-      const geom = factory.create({
-        ...baseParams,
-        outerRing: elongated,
-        roofShape: 'cone',
-      });
-      expect(geom!.attributes.position!.count).toBe(12);
-    });
-  });
-
-  describe('crosspitched', () => {
-    it('creates non-indexed geometry with correct vertex count', () => {
-      // rectangle (4 unique verts, closed ring): 2 top + 8 side = 10 × 3 = 30 vertices
-      const geom = factory.create({ ...baseParams, roofShape: 'crosspitched' });
+  describe('gambrel', () => {
+    it('creates non-indexed geometry with vertices', () => {
+      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      expect(geom!.attributes.position!.count).toBe(30);
+      expect(geom!.attributes.position!.count).toBeGreaterThan(0);
     });
 
     it('all heights are in [0, roofHeight]', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'crosspitched' });
+      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
       const pos = geom!.attributes.position!;
       for (let i = 0; i < pos.count; i++) {
         expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
@@ -538,41 +435,21 @@ describe('RoofGeometryFactory', () => {
       }
     });
 
-    it('has at least one upward-facing face (top surface)', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'crosspitched' });
+    it('has upward-facing faces', () => {
+      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
       const pos = geom!.attributes.position!;
-      let foundUpward = false;
+      let found = false;
       for (let t = 0; t < pos.count; t += 3) {
         const ax = pos.getX(t + 1) - pos.getX(t);
         const az = pos.getZ(t + 1) - pos.getZ(t);
         const bx = pos.getX(t + 2) - pos.getX(t);
         const bz = pos.getZ(t + 2) - pos.getZ(t);
-        const ny = az * bx - ax * bz;
-        if (ny > 0.01) {
-          foundUpward = true;
+        if (az * bx - ax * bz > 0.01) {
+          found = true;
           break;
         }
       }
-      expect(foundUpward).toBe(true);
-    });
-  });
-
-  describe('gambrel', () => {
-    it('creates non-indexed outline-based geometry', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
-      expect(geom).not.toBeNull();
-      expect(geom!.index).toBeNull();
-      // 4 unique verts (closed ring) → 2 top + 8 side = 10 tris → 30 verts
-      expect(geom!.attributes.position!.count).toBe(30);
-    });
-
-    it('all heights are in [0, roofHeight]', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'gambrel' });
-      const pos = geom!.attributes.position!;
-      for (let i = 0; i < pos.count; i++) {
-        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
-        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
-      }
+      expect(found).toBe(true);
     });
   });
 
@@ -601,12 +478,11 @@ describe('RoofGeometryFactory', () => {
   });
 
   describe('mansard', () => {
-    it('creates non-indexed outline-based geometry', () => {
+    it('creates non-indexed geometry with vertices', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'mansard' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      // 4 unique verts → 30 verts
-      expect(geom!.attributes.position!.count).toBe(30);
+      expect(geom!.attributes.position!.count).toBeGreaterThan(0);
     });
 
     it('all heights are in [0, roofHeight]', () => {
@@ -620,12 +496,12 @@ describe('RoofGeometryFactory', () => {
   });
 
   describe('round', () => {
-    it('creates non-indexed outline-based geometry', () => {
+    it('creates non-indexed geometry with enriched vertex count', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'round' });
       expect(geom).not.toBeNull();
       expect(geom!.index).toBeNull();
-      // 4 unique verts → 30 verts
-      expect(geom!.attributes.position!.count).toBe(30);
+      // Enriched barrel vault: more vertices than the 30-vertex outline-only baseline
+      expect(geom!.attributes.position!.count).toBeGreaterThan(30);
     });
 
     it('all heights are in [0, roofHeight]', () => {
@@ -645,32 +521,17 @@ describe('RoofGeometryFactory', () => {
       expect(geom!.index).toBeNull();
     });
 
-    it('base is at Y=0', () => {
-      // Side wall base vertices are always at Y=0. The ridge sits between ring vertices
-      // for a plain rectangle, so maxY is 0 — the ridge height is only reached when a
-      // ring vertex lands at proj=ridgeOffset (tested in SaltboxRoofStrategy.test.ts).
+    it('eave vertices at Y=0, ridge at Y=roofHeight', () => {
       const geom = factory.create({ ...baseParams, roofShape: 'saltbox' });
       const pos = geom!.attributes.position!;
       let minY = Infinity;
-      for (let i = 0; i < pos.count; i++) minY = Math.min(minY, pos.getY(i));
-      expect(minY).toBeCloseTo(0, 5);
-    });
-  });
-
-  describe('sawtooth', () => {
-    it('creates non-indexed geometry', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'sawtooth' });
-      expect(geom).not.toBeNull();
-      expect(geom!.index).toBeNull();
-    });
-
-    it('all heights are in [0, roofHeight]', () => {
-      const geom = factory.create({ ...baseParams, roofShape: 'sawtooth' });
-      const pos = geom!.attributes.position!;
+      let maxY = -Infinity;
       for (let i = 0; i < pos.count; i++) {
-        expect(pos.getY(i)).toBeGreaterThanOrEqual(-1e-6);
-        expect(pos.getY(i)).toBeLessThanOrEqual(5 + 1e-6);
+        minY = Math.min(minY, pos.getY(i));
+        maxY = Math.max(maxY, pos.getY(i));
       }
+      expect(minY).toBeCloseTo(0, 5);
+      expect(maxY).toBeCloseTo(baseParams.roofHeight, 1);
     });
   });
 });

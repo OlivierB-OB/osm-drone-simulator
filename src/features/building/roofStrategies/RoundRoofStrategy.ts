@@ -4,22 +4,21 @@ import {
   computeOBB,
   normalizeRing,
   buildOutlineRoofGeometry,
+  enrichRingWithSubdivisions,
 } from './roofGeometryUtils';
 
 /**
- * Round (barrel vault) roof: semi-elliptical cross-section across the building width.
- * Height = roofHeight * sqrt(1 - (acrossProj/halfWidth)^2)
+ * Round (barrel vault) roof: semi-elliptical cross-section across the shorter
+ * building axis. Uses ring enrichment to produce visible curvature.
  *
- * Uses outline-based triangulation.
+ * Height = roofHeight * sqrt(1 - (acrossProj/halfWidth)^2)
  */
 export class RoundRoofStrategy implements IRoofGeometryStrategy {
   create(params: RoofParams): BufferGeometry {
-    const ring = params.outerRing;
-    const h = params.roofHeight;
-    const obb = computeOBB(ring);
-    const { count, isCCW } = normalizeRing(ring);
+    const { outerRing, innerRings, roofHeight: h } = params;
+    const obb = computeOBB(outerRing);
 
-    // If wider than long, swap axes so barrel spans the longer dimension
+    // Barrel spans the shorter dimension
     let halfWidth = obb.halfWidth;
     let ridgeAngle = params.ridgeAngle;
     if (obb.halfWidth > obb.halfLength) {
@@ -32,34 +31,58 @@ export class RoundRoofStrategy implements IRoofGeometryStrategy {
 
     const computeHeight = (x: number, y: number): number => {
       const proj = x * acrossX + y * acrossY;
-      const t = proj / halfWidth; // -1..+1
+      const t = proj / halfWidth;
       if (Math.abs(t) >= 1) return 0;
       return h * Math.sqrt(1 - t * t);
     };
 
-    const heights = new Float64Array(count);
-    for (let i = 0; i < count; i++) {
-      heights[i] = computeHeight(ring[i]![0], ring[i]![1]);
+    // Enrich outer ring with subdivision vertices
+    const { count: outerCount, isCCW } = normalizeRing(outerRing);
+    const enrichedOuter = enrichRingWithSubdivisions(
+      outerRing,
+      outerCount,
+      acrossX,
+      acrossY,
+      halfWidth
+    );
+    const outerHeights = new Float64Array(enrichedOuter.length);
+    for (let i = 0; i < enrichedOuter.length; i++) {
+      outerHeights[i] = computeHeight(
+        enrichedOuter[i]![0],
+        enrichedOuter[i]![1]
+      );
     }
 
+    // Enrich inner rings
+    let enrichedInners: [number, number][][] | undefined;
     let innerHeights: Float64Array[] | undefined;
-    if (params.innerRings) {
-      innerHeights = params.innerRings.map((inner) => {
-        const { count: hCount } = normalizeRing(inner);
-        const hArr = new Float64Array(hCount);
-        for (let i = 0; i < hCount; i++) {
-          hArr[i] = computeHeight(inner[i]![0], inner[i]![1]);
+    if (innerRings && innerRings.length > 0) {
+      enrichedInners = [];
+      innerHeights = [];
+      for (const inner of innerRings) {
+        const { count: ic } = normalizeRing(inner);
+        const enriched = enrichRingWithSubdivisions(
+          inner,
+          ic,
+          acrossX,
+          acrossY,
+          halfWidth
+        );
+        enrichedInners.push(enriched);
+        const hArr = new Float64Array(enriched.length);
+        for (let i = 0; i < enriched.length; i++) {
+          hArr[i] = computeHeight(enriched[i]![0], enriched[i]![1]);
         }
-        return hArr;
-      });
+        innerHeights.push(hArr);
+      }
     }
 
     return buildOutlineRoofGeometry(
-      ring,
-      heights,
+      enrichedOuter,
+      outerHeights,
       isCCW,
-      count,
-      params.innerRings,
+      enrichedOuter.length,
+      enrichedInners,
       innerHeights
     );
   }
