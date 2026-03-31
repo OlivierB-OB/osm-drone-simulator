@@ -1,6 +1,5 @@
 import type { VegetationVisual } from './types';
-import type { LineString, Point, Polygon } from 'geojson';
-import type { GeoBounds } from '../../data/elevation/types';
+import type { Feature, LineString, Point, Polygon } from 'geojson';
 import { groundColors } from '../../config';
 import type { HexColor } from '../sharedTypes';
 import { clipPolygonToBounds, clipLineStringToBounds } from '../clipGeometry';
@@ -45,7 +44,7 @@ export function classifyOvertureVegetation(
   id: string,
   props: Record<string, unknown>,
   geometry: Polygon | LineString | Point,
-  bounds: GeoBounds
+  boundsPolygon: Feature<Polygon>
 ): VegetationVisual | null {
   const rawClass = (props.class as string) ?? 'vegetation';
   // land_cover `class: 'tree'` is a forested polygon area, not an individual tree
@@ -68,11 +67,11 @@ export function classifyOvertureVegetation(
 
   let clippedGeometry: Polygon | LineString | Point;
   if (geometry.type === 'Polygon') {
-    const clipped = clipPolygonToBounds(geometry, bounds);
+    const clipped = clipPolygonToBounds(geometry, boundsPolygon);
     if (!clipped) return null;
     clippedGeometry = clipped;
   } else if (geometry.type === 'LineString') {
-    const clipped = clipLineStringToBounds(geometry, bounds);
+    const clipped = clipLineStringToBounds(geometry, boundsPolygon);
     if (!clipped) return null;
     clippedGeometry = clipped;
   } else {

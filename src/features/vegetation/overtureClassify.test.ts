@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { classifyOvertureVegetation } from './overtureClassify';
 import type { Point, LineString, Polygon } from 'geojson';
+import { polygon } from '@turf/helpers';
 
-const BOUNDS = { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 };
+const BOUNDS_POLYGON = polygon([
+  [
+    [-1, -1],
+    [2, -1],
+    [2, 2],
+    [-1, 2],
+    [-1, -1],
+  ],
+]);
 
 const POINT: Point = { type: 'Point', coordinates: [0, 0] };
 const LINE: LineString = {
@@ -31,7 +40,7 @@ describe('classifyOvertureVegetation', () => {
       'id1',
       { class: 'tree' },
       POLYGON,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('forest');
   });
@@ -41,7 +50,7 @@ describe('classifyOvertureVegetation', () => {
       'id2',
       { class: 'tree' },
       POINT,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('tree');
   });
@@ -51,7 +60,7 @@ describe('classifyOvertureVegetation', () => {
       'id3',
       { class: 'tree' },
       LINE,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('forest');
   });
@@ -61,7 +70,7 @@ describe('classifyOvertureVegetation', () => {
       'id4',
       { class: 'forest' },
       POLYGON,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('forest');
     expect(result!.heightCategory).toBe('tall');
@@ -72,7 +81,7 @@ describe('classifyOvertureVegetation', () => {
       'id5',
       { class: 'tree' },
       POINT,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.heightCategory).toBe('medium');
   });
@@ -82,7 +91,7 @@ describe('classifyOvertureVegetation', () => {
       'id6',
       { class: 'scrub' },
       POLYGON,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('scrub');
   });
@@ -92,7 +101,7 @@ describe('classifyOvertureVegetation', () => {
       'id7',
       { class: 'wood' },
       POLYGON,
-      BOUNDS
+      BOUNDS_POLYGON
     );
     expect(result!.type).toBe('wood');
     expect(result!.heightCategory).toBe('tall');

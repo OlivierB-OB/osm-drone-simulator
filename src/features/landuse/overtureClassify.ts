@@ -1,6 +1,5 @@
 import type { LanduseVisual } from './types';
-import type { Polygon } from 'geojson';
-import type { GeoBounds } from '../../data/elevation/types';
+import type { Feature, Polygon } from 'geojson';
 import { groundColors } from '../../config';
 import area from '@turf/area';
 import { clipPolygonToBounds } from '../clipGeometry';
@@ -9,7 +8,7 @@ export function classifyOvertureLanduse(
   id: string,
   props: Record<string, unknown>,
   geometry: Polygon,
-  bounds: GeoBounds
+  boundsPolygon: Feature<Polygon>
 ): LanduseVisual | null {
   const luType = (props.class as string) ?? 'other';
   const landuseColors = groundColors.landuse as Record<
@@ -18,7 +17,7 @@ export function classifyOvertureLanduse(
   >;
 
   const featureArea = area(geometry);
-  const clipped = clipPolygonToBounds(geometry, bounds);
+  const clipped = clipPolygonToBounds(geometry, boundsPolygon);
   if (!clipped) return null;
 
   return {

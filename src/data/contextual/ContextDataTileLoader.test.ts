@@ -10,6 +10,16 @@ import { classifyOvertureBarrier } from '../../features/barrier/overtureClassify
 import { classifyOvertureStructure } from '../../features/structure/overtureClassify';
 import { polygon, lineString, point } from '@turf/helpers';
 
+const BOUNDS_POLYGON = polygon([
+  [
+    [-1, -1],
+    [2, -1],
+    [2, 2],
+    [-1, 2],
+    [-1, -1],
+  ],
+]);
+
 describe('Overture classify functions', () => {
   it('classifies buildings with visual properties', () => {
     const geom = polygon([
@@ -134,12 +144,12 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
-    const lake = classifyOvertureWater('w1', { class: 'lake' }, geom, {
-      minLng: -1,
-      minLat: -1,
-      maxLng: 2,
-      maxLat: 2,
-    });
+    const lake = classifyOvertureWater(
+      'w1',
+      { class: 'lake' },
+      geom,
+      BOUNDS_POLYGON
+    );
 
     expect(lake!.type).toBe('lake');
     expect(lake!.isArea).toBe(true);
@@ -152,12 +162,12 @@ describe('Overture classify functions', () => {
       [1, 1],
     ]).geometry;
 
-    const river = classifyOvertureWater('w2', { class: 'river' }, geom, {
-      minLng: -1,
-      minLat: -1,
-      maxLng: 2,
-      maxLat: 2,
-    });
+    const river = classifyOvertureWater(
+      'w2',
+      { class: 'river' },
+      geom,
+      BOUNDS_POLYGON
+    );
 
     expect(river!.type).toBe('river');
     expect(river!.isArea).toBe(false);
@@ -188,7 +198,7 @@ describe('Overture classify functions', () => {
       'v1',
       { class: 'forest', height: 25 },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(forest!.type).toBe('forest');
@@ -207,12 +217,11 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
-    const bounds = { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 };
     const landuse = classifyOvertureLanduse(
       'l1',
       { class: 'residential' },
       geom,
-      bounds
+      BOUNDS_POLYGON
     );
 
     expect(landuse).not.toBeNull();
@@ -436,7 +445,7 @@ describe('Overture classify functions', () => {
       'w3',
       { class: 'stream', is_intermittent: true },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(water!.intermittent).toBe(true);
@@ -529,7 +538,7 @@ describe('Overture classify functions', () => {
         }),
       },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(veg!.leafType).toBe('broadleaved');
@@ -556,7 +565,7 @@ describe('Overture classify functions', () => {
         source_tags: { leaf_type: 'needleleaved', circumference: '2.1' },
       },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(veg!.leafType).toBe('needleleaved');
@@ -576,12 +585,12 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
-    const veg = classifyOvertureVegetation('v-st3', { class: 'grass' }, geom, {
-      minLng: -1,
-      minLat: -1,
-      maxLng: 2,
-      maxLat: 2,
-    });
+    const veg = classifyOvertureVegetation(
+      'v-st3',
+      { class: 'grass' },
+      geom,
+      BOUNDS_POLYGON
+    );
 
     expect(veg!.leafType).toBeUndefined();
     expect(veg!.leafCycle).toBeUndefined();
@@ -604,7 +613,7 @@ describe('Overture classify functions', () => {
       'v-st4',
       { class: 'scrub', source_tags: '{not valid json' },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(veg!.leafType).toBeUndefined();
@@ -629,7 +638,7 @@ describe('Overture classify functions', () => {
         source_tags: { diameter_crown: 'wide', leaf_type: 'broadleaved' },
       },
       geom,
-      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
+      BOUNDS_POLYGON
     );
 
     expect(veg!.crownDiameter).toBeUndefined();
