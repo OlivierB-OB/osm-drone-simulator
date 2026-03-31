@@ -331,6 +331,11 @@ export const groundColors = {
     scree: '#c0b090',
     mud: '#a89870',
     glacier: '#e8f0ff',
+    // land_cover subtypes
+    crop: '#c0cc70',
+    snow: '#e8f0ff',
+    barren: '#b8a888',
+    urban: '#d8d4cc',
   },
   water: {
     body: '#3a6ab0',

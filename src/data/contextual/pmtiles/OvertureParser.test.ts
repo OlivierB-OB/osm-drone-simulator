@@ -147,13 +147,102 @@ describe('OvertureParser', () => {
     expect(features.vegetation).toHaveLength(0);
   });
 
-  it('routes land_cover layer to vegetation', () => {
+  it('routes land_cover forest subtype to vegetation with type forest', () => {
     const layers: DecodedTile = new Map([
-      ['land_cover', mockLayer([mockFeature(3, [SQUARE], { class: 'scrub' })])],
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'forest' })]),
+      ],
     ]);
 
     const features = OvertureParser.parse(layers, bounds, coords);
     expect(features.vegetation).toHaveLength(1);
+    expect(features.vegetation[0]!.type).toBe('forest');
+    expect(features.landuse).toHaveLength(0);
+  });
+
+  it('routes land_cover shrub subtype to vegetation normalized as scrub', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'shrub' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.vegetation).toHaveLength(1);
+    expect(features.vegetation[0]!.type).toBe('scrub');
+    expect(features.landuse).toHaveLength(0);
+  });
+
+  it('routes land_cover grass subtype to vegetation', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'grass' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.vegetation).toHaveLength(1);
+    expect(features.vegetation[0]!.type).toBe('grass');
+    expect(features.landuse).toHaveLength(0);
+  });
+
+  it('routes land_cover crop subtype to landuse', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'crop' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.landuse).toHaveLength(1);
+    expect(features.landuse[0]!.type).toBe('crop');
+    expect(features.vegetation).toHaveLength(0);
+  });
+
+  it('routes land_cover snow subtype to landuse', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'snow' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.landuse).toHaveLength(1);
+    expect(features.landuse[0]!.type).toBe('snow');
+    expect(features.vegetation).toHaveLength(0);
+  });
+
+  it('routes land_cover barren subtype to landuse', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'barren' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.landuse).toHaveLength(1);
+    expect(features.landuse[0]!.type).toBe('barren');
+    expect(features.vegetation).toHaveLength(0);
+  });
+
+  it('routes land_cover urban subtype to landuse', () => {
+    const layers: DecodedTile = new Map([
+      [
+        'land_cover',
+        mockLayer([mockFeature(3, [SQUARE], { subtype: 'urban' })]),
+      ],
+    ]);
+
+    const features = OvertureParser.parse(layers, bounds, coords);
+    expect(features.landuse).toHaveLength(1);
+    expect(features.landuse[0]!.type).toBe('urban');
+    expect(features.vegetation).toHaveLength(0);
   });
 
   it('routes infrastructure aeroway classes to airports', () => {
@@ -265,16 +354,6 @@ describe('OvertureParser', () => {
     const features = OvertureParser.parse(layers, bounds, coords);
     expect(features.landuse).toHaveLength(1);
     expect(features.vegetation).toHaveLength(0);
-  });
-
-  it('remaps land_cover Polygon class=tree to forest', () => {
-    const layers: DecodedTile = new Map([
-      ['land_cover', mockLayer([mockFeature(3, [SQUARE], { class: 'tree' })])],
-    ]);
-
-    const features = OvertureParser.parse(layers, bounds, coords);
-    expect(features.vegetation).toHaveLength(1);
-    expect(features.vegetation[0]!.type).toBe('forest');
   });
 
   it('ignores unknown layer names', () => {

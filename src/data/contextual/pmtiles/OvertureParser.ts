@@ -233,19 +233,37 @@ export class OvertureParser {
     boundsPolygon: Feature<Polygon>,
     features: ModulesFeatures
   ): void {
+    const LANDUSE_SUBTYPES = new Set(['crop', 'snow', 'barren', 'urban']);
+
     for (let i = 0; i < layer.length; i++) {
       const f = layer.feature(i);
       const geometry = mvtToGeoGeometry(f, bounds);
       if (!geometry) continue;
       const props = f.properties;
       const id = String(props.id ?? `landcover-${i}`);
-      const visual = classifyOvertureVegetation(
-        id,
-        props,
-        geometry,
-        boundsPolygon
-      );
-      if (visual) features.vegetation.push(visual);
+      const subtype = (props.subtype as string | undefined) ?? '';
+
+      if (LANDUSE_SUBTYPES.has(subtype)) {
+        if (geometry.type !== 'Polygon') continue;
+        const visual = classifyOvertureLanduse(
+          id,
+          { ...props, class: subtype },
+          geometry as Polygon,
+          boundsPolygon
+        );
+        if (visual) features.landuse.push(visual);
+      } else {
+        // forest, shrub, grass, moss, mangrove, wetland → vegetation
+        // Normalize 'shrub' → 'scrub' to match existing ScrubStrategy
+        const vegClass = subtype === 'shrub' ? 'scrub' : subtype;
+        const visual = classifyOvertureVegetation(
+          id,
+          { ...props, class: vegClass },
+          geometry,
+          boundsPolygon
+        );
+        if (visual) features.vegetation.push(visual);
+      }
     }
   }
 

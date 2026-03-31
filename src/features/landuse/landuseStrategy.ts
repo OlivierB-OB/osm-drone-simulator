@@ -28,6 +28,11 @@ export const LANDUSE_TYPES = new Set([
   'scree',
   'mud',
   'glacier',
+  // land_cover subtypes routed to landuse
+  'crop',
+  'snow',
+  'barren',
+  'urban',
 ]);
 
 export const NATURAL_LANDUSE_TYPES = new Set([

@@ -154,28 +154,26 @@ Natural surface cover of the land: forests, grasslands, snow, sand, wetlands, et
 | `version` | integer | Yes | Feature version |
 | `sources` | array | Yes | Source provenance records |
 | `subtype` | string | Yes | Broad land cover category |
-| `class` | string | No | Specific land cover class |
 | `names` | object | No | Localized names |
 | `source_tags` | object | No | Raw upstream tags |
 | `cartography` | object | No | Rendering hints |
 
 ### Subtype Values
 
-| Value | Description |
-|-------|-------------|
-| `crop` | Agricultural crop land |
-| `grass` | Grass and meadow |
-| `moss` | Moss and tundra |
-| `scrub` | Shrubs and scrubland |
-| `snow` | Permanent snow and ice |
-| `tree` | Forested area |
-| `wetland` | Wetland and marsh |
+| Value | Description | Routing |
+|-------|-------------|---------|
+| `forest` | Forested area | vegetation (`forest` type) |
+| `shrub` | Shrubs and scrubland | vegetation (`scrub` type, normalized) |
+| `grass` | Grass and meadow | vegetation |
+| `moss` | Moss and tundra | vegetation |
+| `mangrove` | Mangrove forest | vegetation |
+| `wetland` | Wetland and marsh | vegetation |
+| `crop` | Agricultural crop land | landuse |
+| `snow` | Permanent snow and ice | landuse |
+| `barren` | Bare ground without vegetation | landuse |
+| `urban` | Built-up urban area | landuse |
 
-### Class Values
-
-`crop`, `farmland`, `grass`, `heath`, `mangrove`, `meadow`, `moss`, `orchard`, `scrub`, `snow`, `tree`, `wetland`, `wood`
-
-> **`subtype: 'tree'` / `class: 'tree'`** in `land_cover` is always a forested polygon area. The classifier remaps this to `'forest'` for correct rendering via `ForestStrategy`.
+> **No `class` field** — `land_cover` features only have `subtype`. Routing and classification use `subtype` directly.
 
 ---
 
