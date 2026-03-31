@@ -9,6 +9,7 @@ export interface LanduseVisual {
   geometry: Polygon;
   type: string; // farmland, meadow, park, residential, commercial, etc.
   color: HexColor;
+  area: number; // m², computed from original geometry before clipping
 }
 
 export interface ModuleFeatures {

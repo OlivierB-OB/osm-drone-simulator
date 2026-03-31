@@ -134,11 +134,16 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
-    const lake = classifyOvertureWater('w1', { class: 'lake' }, geom);
+    const lake = classifyOvertureWater('w1', { class: 'lake' }, geom, {
+      minLng: -1,
+      minLat: -1,
+      maxLng: 2,
+      maxLat: 2,
+    });
 
-    expect(lake.type).toBe('lake');
-    expect(lake.isArea).toBe(true);
-    expect(lake.color).toBeDefined();
+    expect(lake!.type).toBe('lake');
+    expect(lake!.isArea).toBe(true);
+    expect(lake!.color).toBeDefined();
   });
 
   it('classifies waterways as lines', () => {
@@ -147,11 +152,16 @@ describe('Overture classify functions', () => {
       [1, 1],
     ]).geometry;
 
-    const river = classifyOvertureWater('w2', { class: 'river' }, geom);
+    const river = classifyOvertureWater('w2', { class: 'river' }, geom, {
+      minLng: -1,
+      minLat: -1,
+      maxLng: 2,
+      maxLat: 2,
+    });
 
-    expect(river.type).toBe('river');
-    expect(river.isArea).toBe(false);
-    expect(river.widthMeters).toBe(20);
+    expect(river!.type).toBe('river');
+    expect(river!.isArea).toBe(false);
+    expect(river!.widthMeters).toBe(20);
   });
 
   it('classifies aeroway features', () => {
@@ -177,12 +187,13 @@ describe('Overture classify functions', () => {
     const forest = classifyOvertureVegetation(
       'v1',
       { class: 'forest', height: 25 },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(forest.type).toBe('forest');
-    expect(forest.heightCategory).toBe('tall');
-    expect(forest.color).toBeDefined();
+    expect(forest!.type).toBe('forest');
+    expect(forest!.heightCategory).toBe('tall');
+    expect(forest!.color).toBeDefined();
   });
 
   it('classifies landuse features', () => {
@@ -196,14 +207,18 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
+    const bounds = { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 };
     const landuse = classifyOvertureLanduse(
       'l1',
       { class: 'residential' },
-      geom
+      geom,
+      bounds
     );
 
-    expect(landuse.type).toBe('residential');
-    expect(landuse.color).toBeDefined();
+    expect(landuse).not.toBeNull();
+    expect(landuse!.type).toBe('residential');
+    expect(landuse!.color).toBeDefined();
+    expect(landuse!.area).toBeGreaterThan(0);
   });
 
   it('classifies buildings with facade_material color', () => {
@@ -420,10 +435,11 @@ describe('Overture classify functions', () => {
     const water = classifyOvertureWater(
       'w3',
       { class: 'stream', is_intermittent: true },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(water.intermittent).toBe(true);
+    expect(water!.intermittent).toBe(true);
   });
 
   it('classifies barriers from infrastructure classes', () => {
@@ -512,13 +528,14 @@ describe('Overture classify functions', () => {
           circumference: '3.2',
         }),
       },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(veg.leafType).toBe('broadleaved');
-    expect(veg.leafCycle).toBe('deciduous');
-    expect(veg.crownDiameter).toBe(8.5);
-    expect(veg.trunkCircumference).toBe(3.2);
+    expect(veg!.leafType).toBe('broadleaved');
+    expect(veg!.leafCycle).toBe('deciduous');
+    expect(veg!.crownDiameter).toBe(8.5);
+    expect(veg!.trunkCircumference).toBe(3.2);
   });
 
   it('extracts 3D attributes from object source_tags', () => {
@@ -538,13 +555,14 @@ describe('Overture classify functions', () => {
         class: 'tree',
         source_tags: { leaf_type: 'needleleaved', circumference: '2.1' },
       },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(veg.leafType).toBe('needleleaved');
-    expect(veg.leafCycle).toBeUndefined();
-    expect(veg.crownDiameter).toBeUndefined();
-    expect(veg.trunkCircumference).toBe(2.1);
+    expect(veg!.leafType).toBe('needleleaved');
+    expect(veg!.leafCycle).toBeUndefined();
+    expect(veg!.crownDiameter).toBeUndefined();
+    expect(veg!.trunkCircumference).toBe(2.1);
   });
 
   it('handles missing source_tags without crashing', () => {
@@ -558,12 +576,17 @@ describe('Overture classify functions', () => {
       ],
     ]).geometry;
 
-    const veg = classifyOvertureVegetation('v-st3', { class: 'grass' }, geom);
+    const veg = classifyOvertureVegetation('v-st3', { class: 'grass' }, geom, {
+      minLng: -1,
+      minLat: -1,
+      maxLng: 2,
+      maxLat: 2,
+    });
 
-    expect(veg.leafType).toBeUndefined();
-    expect(veg.leafCycle).toBeUndefined();
-    expect(veg.crownDiameter).toBeUndefined();
-    expect(veg.trunkCircumference).toBeUndefined();
+    expect(veg!.leafType).toBeUndefined();
+    expect(veg!.leafCycle).toBeUndefined();
+    expect(veg!.crownDiameter).toBeUndefined();
+    expect(veg!.trunkCircumference).toBeUndefined();
   });
 
   it('handles invalid JSON string source_tags gracefully', () => {
@@ -580,11 +603,12 @@ describe('Overture classify functions', () => {
     const veg = classifyOvertureVegetation(
       'v-st4',
       { class: 'scrub', source_tags: '{not valid json' },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(veg.leafType).toBeUndefined();
-    expect(veg.crownDiameter).toBeUndefined();
+    expect(veg!.leafType).toBeUndefined();
+    expect(veg!.crownDiameter).toBeUndefined();
   });
 
   it('handles non-numeric diameter_crown gracefully', () => {
@@ -604,10 +628,11 @@ describe('Overture classify functions', () => {
         class: 'tree',
         source_tags: { diameter_crown: 'wide', leaf_type: 'broadleaved' },
       },
-      geom
+      geom,
+      { minLng: -1, minLat: -1, maxLng: 2, maxLat: 2 }
     );
 
-    expect(veg.crownDiameter).toBeUndefined();
-    expect(veg.leafType).toBe('broadleaved');
+    expect(veg!.crownDiameter).toBeUndefined();
+    expect(veg!.leafType).toBe('broadleaved');
   });
 });

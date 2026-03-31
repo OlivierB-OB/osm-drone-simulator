@@ -144,9 +144,13 @@ export class OvertureParser {
       if (!geometry || geometry.type !== 'Polygon') continue;
       const props = f.properties;
       const id = String(props.id ?? `landuse-${i}`);
-      features.landuse.push(
-        classifyOvertureLanduse(id, props, geometry as Polygon)
+      const visual = classifyOvertureLanduse(
+        id,
+        props,
+        geometry as Polygon,
+        bounds
       );
+      if (visual) features.landuse.push(visual);
     }
   }
 
@@ -171,24 +175,35 @@ export class OvertureParser {
         subtype === 'scrub' ||
         subtype === 'heath'
       ) {
-        features.vegetation.push(
-          classifyOvertureVegetation(id, props, geometry)
-        );
+        const visual = classifyOvertureVegetation(id, props, geometry, bounds);
+        if (visual) features.vegetation.push(visual);
       } else if (featureClass === 'tree' && geometry.type === 'Point') {
-        features.vegetation.push(
-          classifyOvertureVegetation(id, props, geometry as Point)
+        const visual = classifyOvertureVegetation(
+          id,
+          props,
+          geometry as Point,
+          bounds
         );
+        if (visual) features.vegetation.push(visual);
       } else if (
         featureClass === 'tree_row' &&
         geometry.type === 'LineString'
       ) {
-        features.vegetation.push(
-          classifyOvertureVegetation(id, props, geometry as LineString)
+        const visual = classifyOvertureVegetation(
+          id,
+          props,
+          geometry as LineString,
+          bounds
         );
+        if (visual) features.vegetation.push(visual);
       } else if (geometry.type === 'Polygon') {
-        features.landuse.push(
-          classifyOvertureLanduse(id, props, geometry as Polygon)
+        const visual = classifyOvertureLanduse(
+          id,
+          props,
+          geometry as Polygon,
+          bounds
         );
+        if (visual) features.landuse.push(visual);
       }
     }
   }
@@ -204,7 +219,8 @@ export class OvertureParser {
       if (!geometry) continue;
       const props = f.properties;
       const id = String(props.id ?? `landcover-${i}`);
-      features.vegetation.push(classifyOvertureVegetation(id, props, geometry));
+      const visual = classifyOvertureVegetation(id, props, geometry, bounds);
+      if (visual) features.vegetation.push(visual);
     }
   }
 
@@ -265,9 +281,13 @@ export class OvertureParser {
         continue;
       const props = f.properties;
       const id = String(props.id ?? `water-${i}`);
-      features.waters.push(
-        classifyOvertureWater(id, props, geometry as Polygon | LineString)
+      const water = classifyOvertureWater(
+        id,
+        props,
+        geometry as Polygon | LineString,
+        bounds
       );
+      if (water) features.waters.push(water);
     }
   }
 }

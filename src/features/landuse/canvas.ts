@@ -1,4 +1,3 @@
-import area from '@turf/area';
 import type { CanvasDrawContext } from '../types';
 import { drawPolygon } from '../canvasHelpers';
 import type { LanduseVisual } from './types';
@@ -9,9 +8,7 @@ export function drawLanduse(
 ): void {
   const { ctx, bounds, scaleX, scaleY } = draw;
 
-  const sorted = [...features].sort((a, b) => {
-    return area(b.geometry) - area(a.geometry);
-  });
+  const sorted = [...features].sort((a, b) => b.area - a.area);
 
   for (const lu of sorted) {
     ctx.fillStyle = lu.color;

@@ -104,7 +104,7 @@ export const contextDataConfig: TileDataConfig & {
   queryTimeout: 30000,
 
   // Overture Maps PMTiles configuration
-  overtureVersion: '2026-02-18.0',
+  overtureVersion: '2026-03-18.0',
   overtureBaseUrl: 'https://tiles.overturemaps.org',
   overtureThemes: ['buildings', 'transportation', 'base'],
 };

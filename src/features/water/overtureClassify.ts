@@ -1,7 +1,9 @@
 import type { WaterVisual } from './types';
 import type { LineString, Polygon } from 'geojson';
+import type { GeoBounds } from '../../data/elevation/types';
 import { groundColors, waterwayWidthsMeters } from '../../config';
 import type { HexColor } from '../sharedTypes';
+import { clipPolygonToBounds, clipLineStringToBounds } from '../clipGeometry';
 
 function getWaterColorAndWidth(
   waterType: string,
@@ -25,15 +27,27 @@ function getWaterColorAndWidth(
 export function classifyOvertureWater(
   id: string,
   props: Record<string, unknown>,
-  geometry: Polygon | LineString
-): WaterVisual {
+  geometry: Polygon | LineString,
+  bounds: GeoBounds
+): WaterVisual | null {
   const waterClass = (props.class as string) ?? 'water';
   const isArea = geometry.type === 'Polygon';
   const { color, widthMeters } = getWaterColorAndWidth(waterClass, isArea);
 
+  let clippedGeometry: Polygon | LineString;
+  if (geometry.type === 'Polygon') {
+    const clipped = clipPolygonToBounds(geometry, bounds);
+    if (!clipped) return null;
+    clippedGeometry = clipped;
+  } else {
+    const clipped = clipLineStringToBounds(geometry, bounds);
+    if (!clipped) return null;
+    clippedGeometry = clipped;
+  }
+
   return {
     id,
-    geometry,
+    geometry: clippedGeometry,
     type: waterClass,
     isArea,
     widthMeters,

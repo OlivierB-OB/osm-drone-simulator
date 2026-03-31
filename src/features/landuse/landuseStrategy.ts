@@ -1,6 +1,7 @@
 import type { LanduseVisual } from './types';
 import { groundColors } from '../../config';
 import type { Polygon } from 'geojson';
+import area from '@turf/area';
 
 export const LANDUSE_TYPES = new Set([
   'grassland',
@@ -58,6 +59,7 @@ export function classifyLanduse(
       geometry,
       type: naturalType,
       color: landuseColors[naturalType] ?? groundColors.default,
+      area: area(geometry),
     };
   }
 
@@ -72,5 +74,6 @@ export function classifyLanduse(
     geometry,
     type: luType,
     color: landuseColors[luType] ?? groundColors.default,
+    area: area(geometry),
   };
 }
